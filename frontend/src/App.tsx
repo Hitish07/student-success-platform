@@ -19,6 +19,7 @@ import {
   FacultyDashboard,
   FacultyDoubts,
   FacultyFeedback,
+  FacultyPlacements,
   FacultyPortalLayout,
   FacultySupport,
 } from "./faculty/FacultyPortal";
@@ -675,6 +676,7 @@ function AppRoutes() {
           <Route element={<FacultySupport />} path="support" />
           <Route element={<FacultyFeedback />} path="feedback" />
           <Route element={<FacultyDoubts />} path="doubts" />
+          <Route element={<FacultyPlacements />} path="placements" />
           <Route element={<StudentDetailScreen />} path="students/:studentId" />
         </Route>
       </Route>

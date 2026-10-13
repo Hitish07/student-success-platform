@@ -824,6 +824,182 @@ function formatTimestamp(value: string): string {
   return parsed.toLocaleString();
 }
 
+interface PlacementView {
+  id: number;
+  student_id: number;
+  student_name: string;
+  student_email: string;
+  company: string;
+  role: string;
+  package_lpa: number | null;
+  offer_date: string;
+  status: string;
+  created_at: string;
+}
+
+function PlacementsScreen() {
+  const dashboard = useDashboard();
+  const { accessToken } = useAuth();
+  const [courseId, setCourseId] = useState("");
+  const course = dashboard.data?.courses.find((item) => String(item.id) === courseId) ?? null;
+  const roster = useFacultyResource<FacultyStudent[]>(
+    course ? `/faculty/courses/${course.id}/students` : null,
+  );
+  const placements = useFacultyResource<PlacementView[]>("/faculty/placements");
+
+  const [studentId, setStudentId] = useState("");
+  const [company, setCompany] = useState("");
+  const [role, setRole] = useState("");
+  const [packageLpa, setPackageLpa] = useState("");
+  const [offerDate, setOfferDate] = useState(new Date().toISOString().slice(0, 10));
+  const [placementStatus, setPlacementStatus] = useState("offered");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setSuccess(null);
+    if (!studentId) {
+      setError("Choose a student first.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await apiRequest(
+        "/faculty/placements",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            student_id: Number(studentId),
+            company: company.trim(),
+            role: role.trim(),
+            package_lpa: packageLpa.trim() === "" ? null : Number(packageLpa),
+            offer_date: offerDate,
+            status: placementStatus,
+          }),
+        },
+        accessToken ?? undefined,
+      );
+      setSuccess("Placement recorded.");
+      setCompany("");
+      setRole("");
+      setPackageLpa("");
+      placements.reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to record this placement.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <ScreenHeading
+        eyebrow="Career outcomes"
+        title="Placements"
+        description="Record placements for students you teach and review the ones already on file."
+      />
+      <section className="student-panel">
+        <h2>Record a placement</h2>
+        {dashboard.isLoading ? <p className="student-state" role="status">Loading assigned courses...</p>
+          : dashboard.error ? <RetryState error={dashboard.error} onRetry={dashboard.reload} />
+            : !dashboard.data || dashboard.data.courses.length === 0 ? <p className="student-state">No assigned courses are available.</p>
+              : <>
+                  <CoursePicker courses={dashboard.data.courses} onChange={(value) => { setCourseId(value); setStudentId(""); }} value={courseId} />
+                  {!courseId && <p className="student-state">Choose a course to see its students.</p>}
+                  {courseId && (
+                    <ScreenState
+                      emptyMessage="This course has no enrolled students."
+                      error={roster.error}
+                      isEmpty={!roster.data || roster.data.length === 0}
+                      isLoading={roster.isLoading}
+                      onRetry={roster.reload}
+                    >
+                      {roster.data && (
+                        <form className="faculty-form" onSubmit={save}>
+                          <label htmlFor="placement-student">Student</label>
+                          <select
+                            id="placement-student"
+                            onChange={(event) => setStudentId(event.target.value)}
+                            required
+                            value={studentId}
+                          >
+                            <option value="">Choose a student</option>
+                            {roster.data.map((student) => (
+                              <option key={student.id} value={student.id}>{student.full_name}</option>
+                            ))}
+                          </select>
+                          <label htmlFor="placement-company">Company</label>
+                          <input id="placement-company" maxLength={160} onChange={(event) => setCompany(event.target.value)} required value={company} />
+                          <label htmlFor="placement-role">Role</label>
+                          <input id="placement-role" maxLength={160} onChange={(event) => setRole(event.target.value)} required value={role} />
+                          <label htmlFor="placement-package">Package (LPA)</label>
+                          <input id="placement-package" min="0" onChange={(event) => setPackageLpa(event.target.value)} step="0.01" type="number" value={packageLpa} />
+                          <label htmlFor="placement-date">Offer date</label>
+                          <input id="placement-date" onChange={(event) => setOfferDate(event.target.value)} required type="date" value={offerDate} />
+                          <label htmlFor="placement-status">Status</label>
+                          <select id="placement-status" onChange={(event) => setPlacementStatus(event.target.value)} value={placementStatus}>
+                            <option value="offered">Offered</option>
+                            <option value="accepted">Accepted</option>
+                            <option value="declined">Declined</option>
+                            <option value="joined">Joined</option>
+                          </select>
+                          {error && <p className="form-error" role="alert">{error}</p>}
+                          {success && <p className="form-success" role="status">{success}</p>}
+                          <button className="button" disabled={saving || !studentId} type="submit">
+                            {saving ? "Saving..." : "Record placement"}
+                          </button>
+                        </form>
+                      )}
+                    </ScreenState>
+                  )}
+                </>}
+      </section>
+      <section className="student-panel">
+        <h2>Recorded placements</h2>
+        <ScreenState
+          emptyMessage="No placements recorded yet."
+          error={placements.error}
+          isEmpty={!placements.data || placements.data.length === 0}
+          isLoading={placements.isLoading}
+          onRetry={placements.reload}
+        >
+          {placements.data && placements.data.length > 0 && (
+            <div className="faculty-table-wrap">
+              <table className="faculty-table">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Company</th>
+                    <th>Role</th>
+                    <th>Package</th>
+                    <th>Offer date</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {placements.data.map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.student_name}</td>
+                      <td>{row.company}</td>
+                      <td>{row.role}</td>
+                      <td>{row.package_lpa === null ? "-" : `${row.package_lpa} LPA`}</td>
+                      <td>{row.offer_date}</td>
+                      <td>{row.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </ScreenState>
+      </section>
+    </>
+  );
+}
+
 const facultyNavigation = [
   { to: "/faculty", label: "Overview", end: true },
   { to: "/faculty/attendance", label: "Attendance", end: false },
@@ -831,6 +1007,7 @@ const facultyNavigation = [
   { to: "/faculty/support", label: "Student support", end: false },
   { to: "/faculty/feedback", label: "Feedback", end: false },
   { to: "/faculty/doubts", label: "Doubts", end: false },
+  { to: "/faculty/placements", label: "Placements", end: false },
 ];
 
 export function FacultyPortalLayout() {
@@ -865,3 +1042,4 @@ export const FacultyAssessments = AssessmentScreen;
 export const FacultySupport = SupportScreen;
 export const FacultyFeedback = FeedbackScreen;
 export const FacultyDoubts = FacultyDoubtsScreen;
+export const FacultyPlacements = PlacementsScreen;
