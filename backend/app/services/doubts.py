@@ -16,8 +16,20 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import AuditLog, StudentDoubt, StudentProfile, Subject, User
+from app.models import (
+    AuditLog,
+    FacultySubject,
+    StudentDoubt,
+    StudentProfile,
+    Subject,
+    User,
+)
 from app.schemas.doubts import DoubtAsk, DoubtList, DoubtView
+from app.schemas.faculty_portal import (
+    DoubtQuestionView,
+    DoubtTopicSummary,
+    FacultyDoubtsView,
+)
 from app.services.gemini import GeminiError, explain_logic, explain_logic_strict
 
 
@@ -178,4 +190,78 @@ def list_doubts(db: Session, student: User) -> DoubtList:
     return DoubtList(
         doubts=[_doubt_view(doubt, subject) for doubt, subject in rows],
         remaining_today=remaining,
+    )
+
+
+RECENT_PER_TOPIC = 5
+ANSWER_PREVIEW_CHARS = 160
+
+
+def _answer_preview(answer: str) -> str:
+    cleaned = answer.strip()
+    if len(cleaned) <= ANSWER_PREVIEW_CHARS:
+        return cleaned
+    return cleaned[:ANSWER_PREVIEW_CHARS].rstrip() + "..."
+
+
+def get_faculty_doubt_summary(db: Session, faculty: User) -> FacultyDoubtsView:
+    """Summarize student doubts across the subjects this faculty member teaches.
+
+    Questions are anonymous in this view: no student name or email is returned.
+    """
+
+    subject_rows = db.execute(
+        select(Subject)
+        .join(FacultySubject, FacultySubject.subject_id == Subject.id)
+        .where(FacultySubject.faculty_id == faculty.id)
+        .order_by(Subject.code)
+    ).scalars().all()
+
+    if not subject_rows:
+        return FacultyDoubtsView(topics=[], total_doubts=0)
+
+    subject_ids = [subject.id for subject in subject_rows]
+
+    counts = dict(
+        db.execute(
+            select(StudentDoubt.subject_id, func.count())
+            .where(StudentDoubt.subject_id.in_(subject_ids))
+            .group_by(StudentDoubt.subject_id)
+        ).all()
+    )
+
+    topics: list[DoubtTopicSummary] = []
+    for subject in subject_rows:
+        total = counts.get(subject.id, 0)
+        if total == 0:
+            continue
+
+        recent_rows = db.execute(
+            select(StudentDoubt)
+            .where(StudentDoubt.subject_id == subject.id)
+            .order_by(StudentDoubt.created_at.desc(), StudentDoubt.id.desc())
+            .limit(RECENT_PER_TOPIC)
+        ).scalars().all()
+
+        topics.append(
+            DoubtTopicSummary(
+                subject_id=subject.id,
+                subject_code=subject.code,
+                subject_name=subject.name,
+                total=total,
+                recent=[
+                    DoubtQuestionView(
+                        question=doubt.question,
+                        answer_preview=_answer_preview(doubt.answer),
+                        created_at=doubt.created_at,
+                    )
+                    for doubt in recent_rows
+                ],
+            )
+        )
+
+    topics.sort(key=lambda item: (-item.total, item.subject_code))
+    return FacultyDoubtsView(
+        topics=topics,
+        total_doubts=sum(item.total for item in topics),
     )
