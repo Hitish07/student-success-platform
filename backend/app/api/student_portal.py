@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.api.dependencies import AuthenticatedUser, DatabaseSession, require_roles
 from app.models import User
@@ -6,14 +6,20 @@ from app.schemas.student_portal import (
     FacultyCourseFeedback,
     FeedbackSubmission,
     StudentDashboard,
+    StudentAcademicProfile,
+    StudentAcademicProfileUpdate,
     StudentFeedbackResponse,
     StudentJourney,
+    StudentSubjects,
 )
 from app.services.student_portal import (
+    get_academic_profile,
+    get_academic_subjects,
     get_dashboard,
     get_feedback,
     get_journey,
     submit_feedback,
+    update_academic_profile,
 )
 
 router = APIRouter(
@@ -21,6 +27,33 @@ router = APIRouter(
     tags=["student portal"],
     dependencies=[Depends(require_roles("student"))],
 )
+
+
+@router.get("/profile", response_model=StudentAcademicProfile)
+def student_profile(
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> StudentAcademicProfile:
+    return get_academic_profile(db, user)
+
+
+@router.put("/profile", response_model=StudentAcademicProfile)
+def update_student_profile(
+    payload: StudentAcademicProfileUpdate,
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> StudentAcademicProfile:
+    return update_academic_profile(db, user, payload)
+
+
+@router.get("/subjects", response_model=StudentSubjects)
+def student_subjects(
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+    year: int | None = Query(default=None, ge=1, le=4),
+    semester: int | None = Query(default=None, ge=1, le=2),
+) -> StudentSubjects:
+    return get_academic_subjects(db, user, year, semester)
 
 
 @router.get("/dashboard", response_model=StudentDashboard)

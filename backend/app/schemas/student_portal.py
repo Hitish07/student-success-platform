@@ -45,6 +45,31 @@ class StudentDashboard(StudentPortalSchema):
     risk: PersonalRisk | None
 
 
+class StudentAcademicProfile(StudentPortalSchema):
+    name: str
+    department: str
+    department_id: int
+    year: int
+    semester: int
+
+
+class StudentAcademicProfileUpdate(StudentPortalSchema):
+    year: int = Field(ge=1, le=4)
+    semester: int = Field(ge=1, le=2)
+
+
+class StudentSubject(StudentPortalSchema):
+    code: str
+    name: str
+    faculty: list[str]
+
+
+class StudentSubjects(StudentPortalSchema):
+    year: int
+    semester: int
+    subjects: list[StudentSubject]
+
+
 class JourneyEvent(StudentPortalSchema):
     occurred_at: datetime
     event_type: str

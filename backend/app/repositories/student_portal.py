@@ -9,11 +9,15 @@ from app.models import (
     Course,
     Enrollment,
     FacultyFeedback,
+    FacultySubject,
     Intervention,
     Mark,
     RiskScore,
+    StudentProfile,
     StudentFeedback,
+    Subject,
     User,
+    Department,
 )
 
 
@@ -108,6 +112,38 @@ def student_interventions(db: Session, student_id: int) -> list[Intervention]:
         .order_by(Intervention.start_date.desc(), Intervention.id.desc())
     )
     return list(db.scalars(statement).all())
+
+
+def academic_profile(
+    db: Session,
+    student_id: int,
+) -> tuple[StudentProfile, Department] | None:
+    statement = (
+        select(StudentProfile, Department)
+        .join(Department, StudentProfile.department_id == Department.id)
+        .where(StudentProfile.user_id == student_id)
+    )
+    return db.execute(statement).one_or_none()
+
+
+def academic_subjects(
+    db: Session,
+    department_id: int,
+    year: int,
+    semester: int,
+) -> list[tuple[Subject, str | None]]:
+    statement = (
+        select(Subject, User.full_name)
+        .outerjoin(FacultySubject, FacultySubject.subject_id == Subject.id)
+        .outerjoin(User, User.id == FacultySubject.faculty_id)
+        .where(
+            Subject.department_id == department_id,
+            Subject.year == year,
+            Subject.semester == semester,
+        )
+        .order_by(Subject.code, User.full_name)
+    )
+    return list(db.execute(statement).all())
 
 
 def received_feedback(

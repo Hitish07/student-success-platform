@@ -39,6 +39,26 @@ interface Dashboard {
   risk: PersonalRisk | null;
 }
 
+interface AcademicProfile {
+  name: string;
+  department: string;
+  department_id: number;
+  year: number;
+  semester: number;
+}
+
+interface AcademicSubject {
+  code: string;
+  name: string;
+  faculty: string[];
+}
+
+interface AcademicSubjects {
+  year: number;
+  semester: number;
+  subjects: AcademicSubject[];
+}
+
 interface JourneyEvent {
   occurred_at: string;
   event_type: string;
@@ -79,7 +99,7 @@ interface Resource<T> {
   reload: () => void;
 }
 
-function useStudentResource<T>(path: string): Resource<T> {
+function useStudentResource<T>(path: string | null): Resource<T> {
   const { accessToken } = useAuth();
   const [data, setData] = useState<T | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -88,6 +108,11 @@ function useStudentResource<T>(path: string): Resource<T> {
 
   useEffect(() => {
     let mounted = true;
+    if (path === null) {
+      return () => {
+        mounted = false;
+      };
+    }
     setData(null);
     setError(null);
     setIsLoading(true);
@@ -169,6 +194,149 @@ function MetricCard({
       <strong>{value === null ? "—" : `${value}${suffix}`}</strong>
       <p>{value === null ? "No records yet" : "Based on your recorded activity"}</p>
     </article>
+  );
+}
+
+function MyAcademics() {
+  const { accessToken } = useAuth();
+  const profile = useStudentResource<AcademicProfile>("/student/profile");
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [selectedSemester, setSelectedSemester] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  const year = selectedYear ?? profile.data?.year;
+  const semester = selectedSemester ?? profile.data?.semester;
+  const subjectsPath = profile.data && year !== undefined && semester !== undefined
+    ? `/student/subjects?year=${year}&semester=${semester}`
+    : null;
+  const subjects = useStudentResource<AcademicSubjects>(subjectsPath);
+  const hasChanges = profile.data !== null
+    && (year !== profile.data.year || semester !== profile.data.semester);
+
+  async function saveAcademicYear(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (year === undefined || semester === undefined) {
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+    setSaveMessage(null);
+    try {
+      await apiRequest<AcademicProfile>(
+        "/student/profile",
+        {
+          method: "PUT",
+          body: JSON.stringify({ year, semester }),
+        },
+        accessToken ?? undefined,
+      );
+      setSaveMessage("Your current year and semester were updated.");
+      profile.reload();
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : "Unable to update your academic profile.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <section aria-labelledby="academics-heading" className="student-panel">
+      <div className="student-panel-heading">
+        <div>
+          <p className="eyebrow">Department and curriculum</p>
+          <h2 id="academics-heading">My academics</h2>
+        </div>
+      </div>
+      <ScreenState
+        emptyMessage=""
+        error={profile.error}
+        isEmpty={false}
+        isLoading={profile.isLoading}
+        onRetry={profile.reload}
+      >
+        {profile.data && year !== undefined && semester !== undefined && (
+          <>
+            <form className="academic-controls" onSubmit={saveAcademicYear}>
+              <label htmlFor="academic-department">Department</label>
+              <select
+                disabled
+                id="academic-department"
+                value={profile.data.department_id}
+              >
+                <option value={profile.data.department_id}>{profile.data.department}</option>
+              </select>
+              <label htmlFor="academic-year">Year</label>
+              <select
+                id="academic-year"
+                onChange={(event) => {
+                  setSelectedYear(Number(event.target.value));
+                  setSaveMessage(null);
+                }}
+                value={year}
+              >
+                {[1, 2, 3, 4].map((value) => (
+                  <option key={value} value={value}>Year {value}</option>
+                ))}
+              </select>
+              <label htmlFor="academic-semester">Semester</label>
+              <select
+                id="academic-semester"
+                onChange={(event) => {
+                  setSelectedSemester(Number(event.target.value));
+                  setSaveMessage(null);
+                }}
+                value={semester}
+              >
+                {[1, 2].map((value) => (
+                  <option key={value} value={value}>Semester {value}</option>
+                ))}
+              </select>
+              <button className="button button-small" disabled={!hasChanges || isSaving} type="submit">
+                {isSaving ? "Saving…" : "Save current year"}
+              </button>
+            </form>
+            {saveError && <p className="form-error" role="alert">{saveError}</p>}
+            {saveMessage && <p className="form-success" role="status">{saveMessage}</p>}
+            <div className="academic-subjects">
+              <h3>Year {year} · Semester {semester} subjects</h3>
+              <ScreenState
+                emptyMessage="No subjects are listed for this year and semester yet."
+                error={subjects.error}
+                isEmpty={!subjects.data || subjects.data.subjects.length === 0}
+                isLoading={subjects.isLoading}
+                onRetry={subjects.reload}
+              >
+                {subjects.data && subjects.data.subjects.length > 0 && (
+                  <div className="academic-table-scroll">
+                    <table className="academic-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">Code</th>
+                          <th scope="col">Subject</th>
+                          <th scope="col">Faculty</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {subjects.data.subjects.map((subject) => (
+                          <tr key={subject.code}>
+                            <td>{subject.code}</td>
+                            <td>{subject.name}</td>
+                            <td>{subject.faculty.length ? subject.faculty.join(", ") : "Not assigned"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </ScreenState>
+            </div>
+          </>
+        )}
+      </ScreenState>
+    </section>
   );
 }
 
@@ -272,6 +440,7 @@ function DashboardScreen() {
           </>
         )}
       </ScreenState>
+      <MyAcademics />
     </>
   );
 }

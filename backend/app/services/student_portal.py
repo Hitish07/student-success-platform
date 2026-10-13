@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models import User
+from app.models import Department, StudentProfile, User
 from app.repositories import student_portal as repository
 from app.schemas.student_portal import (
     FeedbackGiven,
@@ -14,9 +14,13 @@ from app.schemas.student_portal import (
     PersonalRisk,
     RiskFactor,
     StudentCourse,
+    StudentAcademicProfile,
+    StudentAcademicProfileUpdate,
     StudentDashboard,
     StudentJourney,
     StudentFeedbackResponse,
+    StudentSubject,
+    StudentSubjects,
 )
 
 
@@ -131,6 +135,81 @@ def get_dashboard(db: Session, student: User) -> StudentDashboard:
         enrolled_courses=len(courses),
         courses=courses,
         risk=risk,
+    )
+
+
+def _academic_profile(db: Session, student: User) -> tuple[StudentProfile, Department]:
+    profile = repository.academic_profile(db, student.id)
+    if profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Student academic profile not found.",
+        )
+    return profile
+
+
+def _profile_response(
+    student: User,
+    profile: StudentProfile,
+    department: Department,
+) -> StudentAcademicProfile:
+    return StudentAcademicProfile(
+        name=student.full_name,
+        department=department.name,
+        department_id=department.id,
+        year=profile.year,
+        semester=profile.semester,
+    )
+
+
+def get_academic_profile(db: Session, student: User) -> StudentAcademicProfile:
+    profile, department = _academic_profile(db, student)
+    return _profile_response(student, profile, department)
+
+
+def update_academic_profile(
+    db: Session,
+    student: User,
+    payload: StudentAcademicProfileUpdate,
+) -> StudentAcademicProfile:
+    profile, department = _academic_profile(db, student)
+    profile.year = payload.year
+    profile.semester = payload.semester
+    db.commit()
+    db.refresh(profile)
+    return _profile_response(student, profile, department)
+
+
+def get_academic_subjects(
+    db: Session,
+    student: User,
+    year: int | None,
+    semester: int | None,
+) -> StudentSubjects:
+    profile, _ = _academic_profile(db, student)
+    selected_year = profile.year if year is None else year
+    selected_semester = profile.semester if semester is None else semester
+
+    subjects: list[StudentSubject] = []
+    subject_indexes: dict[int, int] = {}
+    for subject, faculty_name in repository.academic_subjects(
+        db,
+        profile.department_id,
+        selected_year,
+        selected_semester,
+    ):
+        index = subject_indexes.get(subject.id)
+        if index is None:
+            subject_indexes[subject.id] = len(subjects)
+            subjects.append(StudentSubject(code=subject.code, name=subject.name, faculty=[]))
+            index = len(subjects) - 1
+        if faculty_name is not None and faculty_name not in subjects[index].faculty:
+            subjects[index].faculty.append(faculty_name)
+
+    return StudentSubjects(
+        year=selected_year,
+        semester=selected_semester,
+        subjects=subjects,
     )
 
 

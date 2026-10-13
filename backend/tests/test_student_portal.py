@@ -1,6 +1,8 @@
 from datetime import date
 from decimal import Decimal
 
+import pytest
+
 from app.models import (
     Assessment,
     Attendance,
@@ -10,7 +12,10 @@ from app.models import (
     FacultyFeedback,
     Mark,
     RiskScore,
+    FacultySubject,
+    StudentProfile,
     StudentFeedback,
+    Subject,
     User,
 )
 from app.core.security import hash_password
@@ -19,7 +24,8 @@ from app.core.security import hash_password
 def student_portal_records(database):
     with database() as session:
         department = Department(name="Student Portal Department", code="PORTAL")
-        session.add(department)
+        other_department = Department(name="Other Portal Department", code="OTHER")
+        session.add_all([department, other_department])
         session.flush()
 
         faculty_a = User(
@@ -52,6 +58,52 @@ def student_portal_records(database):
         )
         session.add_all([faculty_a, faculty_b, student_a, student_b])
         session.flush()
+        session.add_all(
+            [
+                StudentProfile(
+                    user_id=student_a.id,
+                    department_id=department.id,
+                    year=2,
+                    semester=1,
+                ),
+                StudentProfile(
+                    user_id=student_b.id,
+                    department_id=department.id,
+                    year=4,
+                    semester=2,
+                ),
+            ]
+        )
+        portal_subject = Subject(
+            department_id=department.id,
+            code="PORTAL201",
+            name="Portal Systems",
+            year=2,
+            semester=1,
+        )
+        browse_subject = Subject(
+            department_id=department.id,
+            code="PORTAL402",
+            name="Advanced Portal Systems",
+            year=4,
+            semester=2,
+        )
+        private_subject = Subject(
+            department_id=other_department.id,
+            code="OTHER201",
+            name="Other Department Systems",
+            year=2,
+            semester=1,
+        )
+        session.add_all([portal_subject, browse_subject, private_subject])
+        session.flush()
+        session.add_all(
+            [
+                FacultySubject(faculty_id=faculty_a.id, subject_id=portal_subject.id),
+                FacultySubject(faculty_id=faculty_b.id, subject_id=portal_subject.id),
+                FacultySubject(faculty_id=faculty_b.id, subject_id=private_subject.id),
+            ]
+        )
 
         course_a = Course(
             department_id=department.id,
@@ -179,6 +231,8 @@ def student_portal_records(database):
             "faculty_b": faculty_b.id,
             "course_a": course_a.id,
             "course_b": course_b.id,
+            "department_a": department.id,
+            "department_b": other_department.id,
         }
 
 
@@ -262,3 +316,102 @@ def test_feedback_submission_uses_authenticated_student_and_enrollment(client, d
         saved_feedback = session.get(FacultyFeedback, accepted.json()["id"])
         assert saved_feedback is not None
         assert saved_feedback.student_id == records["student_a"]
+
+
+def test_student_academics_are_scoped_to_own_department_and_can_browse(client, database):
+    records = student_portal_records(database)
+    login = client.post(
+        "/auth/login",
+        json={"email": "student.a@demo.invalid", "password": "StudentPass123!"},
+    )
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    profile = client.get("/student/profile", headers=headers)
+    default_subjects = client.get("/student/subjects", headers=headers)
+    browsed_subjects = client.get(
+        "/student/subjects?year=4&semester=2",
+        headers=headers,
+    )
+    forged_department = client.get(
+        f"/student/subjects?year=2&semester=1&department_id={records['department_b']}",
+        headers=headers,
+    )
+
+    assert profile.status_code == 200
+    assert profile.json() == {
+        "name": "Student A",
+        "department": "Student Portal Department",
+        "department_id": records["department_a"],
+        "year": 2,
+        "semester": 1,
+    }
+    default_result = default_subjects.json()
+    assert default_result["year"] == 2
+    assert default_result["semester"] == 1
+    assert [subject["code"] for subject in default_result["subjects"]] == ["PORTAL201"]
+    assert default_result["subjects"][0]["faculty"] == ["Faculty A", "Faculty B"]
+    assert [subject["code"] for subject in browsed_subjects.json()["subjects"]] == ["PORTAL402"]
+    assert [subject["code"] for subject in forged_department.json()["subjects"]] == ["PORTAL201"]
+    assert "OTHER201" not in str(forged_department.json())
+
+
+def test_student_can_update_only_own_academic_year_and_semester(client, database):
+    records = student_portal_records(database)
+    login = client.post(
+        "/auth/login",
+        json={"email": "student.a@demo.invalid", "password": "StudentPass123!"},
+    )
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    response = client.put(
+        "/student/profile",
+        headers=headers,
+        json={"year": 3, "semester": 2},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["year"] == 3
+    assert response.json()["semester"] == 2
+    with database() as session:
+        other_student_profile = session.query(StudentProfile).filter_by(
+            user_id=records["student_b"]
+        ).one()
+        assert (other_student_profile.year, other_student_profile.semester) == (4, 2)
+
+
+@pytest.mark.parametrize(
+    ("payload", "query"),
+    [
+        ({"year": 0, "semester": 1}, ""),
+        ({"year": 5, "semester": 1}, ""),
+        ({"year": 2, "semester": 0}, ""),
+        ({"year": 2, "semester": 3}, ""),
+        (None, "?year=0"),
+        (None, "?year=5"),
+        (None, "?semester=0"),
+        (None, "?semester=3"),
+    ],
+)
+def test_academic_year_and_semester_are_validated(client, database, payload, query):
+    student_portal_records(database)
+    login = client.post(
+        "/auth/login",
+        json={"email": "student.a@demo.invalid", "password": "StudentPass123!"},
+    )
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    if payload is not None:
+        response = client.put("/student/profile", headers=headers, json=payload)
+    else:
+        response = client.get(f"/student/subjects{query}", headers=headers)
+
+    assert response.status_code == 422
+
+
+def test_student_academic_endpoints_require_authentication(client):
+    assert client.get("/student/profile").status_code == 401
+    assert client.get("/student/subjects").status_code == 401
+    assert client.put(
+        "/student/profile",
+        json={"year": 1, "semester": 1},
+    ).status_code == 401

@@ -469,6 +469,14 @@ code {
   border: 1px solid #e1e9ec;
   border-radius: 13px;
   padding: 19px;
+  }
+
+  .academic-controls {
+  grid-template-columns: 1fr;
+  }
+
+  .academic-controls .button {
+  grid-column: auto;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 7px 24px rgba(24, 52, 65, 0.035);
 }
@@ -593,6 +601,92 @@ code {
   color: #687a82;
   font-size: 13px;
   line-height: 1.55;
+}
+
+.academic-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 9px 13px;
+}
+
+.academic-controls label {
+  color: #284351;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.academic-controls select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #cdd9de;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  color: #203a48;
+  font: inherit;
+  font-size: 13px;
+}
+
+.academic-controls select:disabled {
+  background: #f3f6f6;
+  color: #687a82;
+}
+
+.academic-controls .button {
+  justify-self: start;
+  grid-column: 1 / -1;
+}
+
+.academic-subjects {
+  margin-top: 24px;
+}
+
+.academic-subjects h3 {
+  margin: 0 0 12px;
+  color: #284351;
+  font-size: 14px;
+}
+
+.academic-table-scroll {
+  overflow-x: auto;
+  border: 1px solid #e5ecee;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.academic-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.academic-table th,
+.academic-table td {
+  border-bottom: 1px solid #edf1f2;
+  padding: 12px 14px;
+}
+
+.academic-table th {
+  background: #f7f9f9;
+  color: #62747d;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.academic-table td {
+  color: #284351;
+}
+
+.academic-table td:first-child {
+  color: #277c6c;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.academic-table tbody tr:last-child td {
+  border-bottom: 0;
 }
 
 .demo-login {

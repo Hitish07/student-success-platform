@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import App from "../App";
@@ -20,6 +20,35 @@ const studentResponse = {
 function apiResponse(url: string) {
   if (url.endsWith("/auth/refresh")) {
     return { status: 200, body: studentResponse };
+  }
+  if (url.endsWith("/student/profile")) {
+    return {
+      status: 200,
+      body: {
+        name: "Demo Student",
+        department: "Computer Science",
+        department_id: 1,
+        year: 2,
+        semester: 1,
+      },
+    };
+  }
+  if (url.startsWith("/student/subjects")) {
+    const advanced = url.includes("year=3");
+    return {
+      status: 200,
+      body: {
+        year: advanced ? 3 : 2,
+        semester: 1,
+        subjects: [
+          {
+            code: advanced ? "CS301" : "CS201",
+            name: advanced ? "Algorithms" : "Data Structures",
+            faculty: ["Faculty Member"],
+          },
+        ],
+      },
+    };
   }
   if (url.endsWith("/student/dashboard")) {
     return {
@@ -121,6 +150,80 @@ describe("student portal screens", () => {
       "/student/dashboard",
       expect.objectContaining({ headers: expect.any(Headers) }),
     );
+  });
+
+  it("loads academics, browses subjects, and saves the current year and semester", async () => {
+    const fetchMock = installSessionFetch();
+
+    render(
+      <MemoryRouter initialEntries={["/student"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Data Structures")).toBeTruthy();
+    expect(screen.getByLabelText("Department")).toHaveProperty("value", "1");
+    expect(screen.getByLabelText("Year")).toHaveProperty("value", "2");
+    expect(screen.getByLabelText("Semester")).toHaveProperty("value", "1");
+    expect(screen.getByText("Faculty Member")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Year"), { target: { value: "3" } });
+    expect(await screen.findByText("Algorithms")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Save current year" }));
+    expect(await screen.findByText("Your current year and semester were updated.")).toBeTruthy();
+    expect(
+      fetchMock.mock.calls.some(
+        ([url, options]) =>
+          url === "/student/profile"
+          && options?.method === "PUT"
+          && options.body === JSON.stringify({ year: 3, semester: 1 }),
+      ),
+    ).toBe(true);
+  });
+
+  it("shows academic subject errors and the empty state after retry", async () => {
+    sessionStorage.setItem("student-success.refresh-token", "stored-refresh-token");
+    let subjectAttempts = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.startsWith("/student/subjects")) {
+          subjectAttempts += 1;
+          if (subjectAttempts === 1) {
+            return Promise.resolve(
+              new Response(JSON.stringify({ detail: "Subjects temporarily unavailable." }), {
+                status: 503,
+                headers: { "Content-Type": "application/json" },
+              }),
+            );
+          }
+          return Promise.resolve(
+            new Response(JSON.stringify({ year: 2, semester: 1, subjects: [] }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        }
+        const response = apiResponse(url);
+        return Promise.resolve(
+          new Response(JSON.stringify(response.body), {
+            status: response.status,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/student"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Subjects temporarily unavailable.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("No subjects are listed for this year and semester yet.")).toBeTruthy();
   });
 
   it("renders the journey timeline and its empty state", async () => {
