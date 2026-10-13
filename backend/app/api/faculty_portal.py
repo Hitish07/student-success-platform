@@ -21,6 +21,7 @@ from app.schemas.faculty_portal import (
     StudentNoteCreate,
     StudentNoteUpdate,
     StudentNoteView,
+    Student360View,
     FacultyDoubtsView,
     SuccessResponse,
 )
@@ -36,6 +37,7 @@ from app.schemas.assignments import AttemptActivityView
 from app.services import assignments as assignments_service
 from app.services import faculty_portal as service
 from app.services.doubts import get_faculty_doubt_summary
+from app.services.student_360 import get_student_360
 
 router = APIRouter(
     prefix="/faculty",
@@ -283,3 +285,15 @@ def faculty_doubts(
     db: DatabaseSession,
 ) -> FacultyDoubtsView:
     return get_faculty_doubt_summary(db, user)
+
+
+@router.get(
+    "/students/{student_id}/summary",
+    response_model=Student360View,
+)
+def faculty_student_360(
+    student_id: int,
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> Student360View:
+    return get_student_360(db, user, student_id)
