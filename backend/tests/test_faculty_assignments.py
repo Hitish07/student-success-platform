@@ -457,3 +457,101 @@ def test_grading_rejects_invalid_marks_and_other_faculty(client, database):
 
     row = client.get(f"/faculty/assignments/{records['assignment_id']}/submissions", headers=faculty_headers).json()[0]
     assert row["marks"] is None
+
+
+def test_tab_switches_cancel_attempt_after_limit_and_force_redo(client, database):
+    records = assignment_records(database)
+    headers = bearer(client, "assignment.student@example.invalid")
+    base = f"/student/assignments/{records['assignment_id']}"
+
+    start = client.post(f"{base}/attempt", headers=headers)
+    assert start.status_code == 200
+    first = start.json()
+    assert first["tab_switches"] == 0
+    assert first["status"] == "active"
+    assert first["limit"] == 3
+
+    for expected in (1, 2, 3):
+        step = client.post(f"{base}/tab-switch", headers=headers)
+        assert step.status_code == 200
+        assert step.json()["tab_switches"] == expected
+        assert step.json()["status"] == "active"
+
+    fourth = client.post(f"{base}/tab-switch", headers=headers)
+    assert fourth.status_code == 200
+    assert fourth.json()["status"] == "voided"
+    assert fourth.json()["voided_attempts"] == 1
+
+    blocked = client.post(f"{base}/submit", headers=headers, json={"answer_text": "too late"})
+    assert blocked.status_code == 409
+
+    nope = client.post(f"{base}/tab-switch", headers=headers)
+    assert nope.status_code == 409
+
+    again = client.post(f"{base}/attempt", headers=headers)
+    assert again.status_code == 200
+    second = again.json()
+    assert second["tab_switches"] == 0
+    assert second["attempt_id"] != first["attempt_id"]
+    assert second["voided_attempts"] == 1
+
+    ok = client.post(f"{base}/submit", headers=headers, json={"answer_text": "Fresh answer"})
+    assert ok.status_code == 201
+
+
+def test_faculty_sees_tab_switch_counts_and_redo(client, database):
+    from app.models import Assignment, User
+
+    records = assignment_records(database)
+    aid = records["assignment_id"]
+    headers = bearer(client, "assignment.student@example.invalid")
+    with database() as db:
+        owner_email = db.get(User, db.get(Assignment, aid).faculty_id).email
+    faculty_headers = bearer(client, owner_email)
+    base = f"/student/assignments/{aid}"
+
+    client.post(f"{base}/attempt", headers=headers)
+    for _ in range(4):
+        client.post(f"{base}/tab-switch", headers=headers)
+
+    attempts = client.get(f"/faculty/assignments/{aid}/attempts", headers=faculty_headers)
+    assert attempts.status_code == 200
+    rows = attempts.json()
+    assert len(rows) == 1
+    assert rows[0]["status"] == "voided"
+    assert rows[0]["tab_switches"] == 4
+    assert rows[0]["student_email"] == "assignment.student@example.invalid"
+
+    client.post(f"{base}/attempt", headers=headers)
+    client.post(f"{base}/tab-switch", headers=headers)
+    assert client.post(f"{base}/submit", headers=headers, json={"answer_text": "Second try"}).status_code == 201
+
+    listing = client.get(f"/faculty/assignments/{aid}/submissions", headers=faculty_headers)
+    assert listing.status_code == 200
+    submission = listing.json()[0]
+    assert submission["tab_switches"] == 1
+    assert submission["redo_count"] == 1
+
+    # Student token cannot see faculty-only attempt list
+    assert client.get(f"/faculty/assignments/{aid}/attempts", headers=headers).status_code in {401, 403}
+
+
+def test_attempt_endpoints_respect_scope_and_submission(client, database):
+    records = assignment_records(database)
+    headers = bearer(client, "assignment.student@example.invalid")
+
+    # Out-of-scope assignment (other department subject)
+    other = f"/student/assignments/{records['other_assignment_id']}"
+    assert client.post(f"{other}/attempt", headers=headers).status_code == 404
+    assert client.post(f"{other}/tab-switch", headers=headers).status_code == 404
+
+    # Tab-switch before starting any attempt
+    mine = f"/student/assignments/{records['assignment_id']}"
+    assert client.post(f"{mine}/tab-switch", headers=headers).status_code == 409
+
+    # Submit with no attempt at all still works (backwards compatible)
+    assert client.post(f"{mine}/submit", headers=headers, json={"answer_text": "done"}).status_code == 201
+
+    # After submission, both attempt endpoints are blocked
+    assert client.post(f"{mine}/attempt", headers=headers).status_code == 409
+    assert client.post(f"{mine}/tab-switch", headers=headers).status_code == 409
