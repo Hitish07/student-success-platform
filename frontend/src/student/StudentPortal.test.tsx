@@ -160,6 +160,26 @@ function installAssignmentFetch(options: { storedAnswer?: string; submitStatus?:
     if (url.endsWith("/student/assignments")) {
       return json([assignmentRow(answer)]);
     }
+    if (url.endsWith("/student/assignments/5/attempt")) {
+      return json({
+        attempt_id: 1,
+        assignment_id: 5,
+        tab_switches: 0,
+        limit: 3,
+        status: "active",
+        voided_attempts: 0,
+      });
+    }
+    if (url.endsWith("/student/assignments/5/tab-switch")) {
+      return json({
+        attempt_id: 2,
+        assignment_id: 5,
+        tab_switches: 4,
+        limit: 3,
+        status: "voided",
+        voided_attempts: 1,
+      });
+    }
     if (url.endsWith("/student/assignments/5/submit")) {
       if (options.submitStatus && options.submitStatus !== 201) {
         return json({ detail: "Unable to submit right now." }, options.submitStatus);
@@ -429,5 +449,32 @@ describe("student portal screens", () => {
 
     expect(await screen.findByText("Unable to submit right now.")).toBeTruthy();
     expect(screen.getByLabelText("Your answer")).toHaveProperty("value", "My answer");
+  });
+
+  it("blocks pasting into the assignment answer", async () => {
+    installAssignmentFetch();
+    renderStudentHome();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open" }));
+    const box = screen.getByLabelText("Your answer");
+    expect(fireEvent.paste(box)).toBe(false);
+    expect(fireEvent.drop(box)).toBe(false);
+    expect(await screen.findByText(/Pasting is disabled/)).toBeTruthy();
+  });
+
+  it("cancels the attempt and clears the answer after too many tab switches", async () => {
+    const fetchMock = installAssignmentFetch();
+    renderStudentHome();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open" }));
+    expect(await screen.findByText(/Tab switches: 0 of 3 allowed/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Your answer"), { target: { value: "Half written" } });
+    fireEvent.blur(window);
+
+    expect(await screen.findByText(/cancelled and your answer was cleared/)).toBeTruthy();
+    expect(screen.getByLabelText("Your answer")).toHaveProperty("value", "");
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url).endsWith("/student/assignments/5/tab-switch")),
+    ).toBe(true);
   });
 });
