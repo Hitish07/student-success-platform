@@ -31,6 +31,7 @@ from app.schemas.assignments import (
     SubjectStudentView,
     SubmissionGradingView,
 )
+from app.schemas.assignments import AttemptActivityView
 from app.services import assignments as assignments_service
 from app.services import faculty_portal as service
 
@@ -260,3 +261,15 @@ def faculty_alerts(user: AuthenticatedUser, db: DatabaseSession) -> list[AlertVi
 @router.get("/feedback", response_model=list[FacultyFeedbackView])
 def faculty_feedback(user: AuthenticatedUser, db: DatabaseSession) -> list[FacultyFeedbackView]:
     return service.get_faculty_feedback(db, user)
+
+
+@router.get(
+    "/assignments/{assignment_id}/attempts",
+    response_model=list[AttemptActivityView],
+)
+def assignment_attempts(
+    assignment_id: int,
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> list[AttemptActivityView]:
+    return assignments_service.get_assignment_attempts(db, user, assignment_id)
