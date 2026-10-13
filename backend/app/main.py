@@ -5,6 +5,7 @@ from app.api.auth import router as auth_router
 from app.api.data_integration import router as data_integration_router
 from app.api.faculty_portal import router as faculty_portal_router
 from app.api.portals import router as portals_router
+from app.api.principal_portal import router as principal_portal_router
 from app.api.student_portal import router as student_portal_router
 from app.core.config import settings
 
@@ -22,6 +23,7 @@ app.include_router(auth_router)
 app.include_router(portals_router)
 app.include_router(student_portal_router)
 app.include_router(faculty_portal_router)
+app.include_router(principal_portal_router)
 app.include_router(data_integration_router)
 
 
