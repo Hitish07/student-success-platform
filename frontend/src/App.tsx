@@ -190,6 +190,7 @@ function RegisterPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [isLoadingDepartments, setIsLoadingDepartments] = useState(true);
   const [departmentError, setDepartmentError] = useState<string | null>(null);
+  const [departmentLoadAttempt, setDepartmentLoadAttempt] = useState(0);
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
@@ -200,16 +201,20 @@ function RegisterPage() {
 
   useEffect(() => {
     let mounted = true;
-    apiRequest<Department[]>("/auth/departments")
+    setIsLoadingDepartments(true);
+    setDepartmentError(null);
+    apiRequest<Department[]>("/auth/departments", { signal: AbortSignal.timeout(8000) })
       .then((rows) => {
         if (mounted) {
           setDepartments(rows);
           setDepartmentId(String(rows[0]?.id ?? ""));
         }
       })
-      .catch((cause: unknown) => {
+      .catch(() => {
         if (mounted) {
-          setDepartmentError(cause instanceof Error ? cause.message : "Unable to load departments.");
+          setDepartmentError(
+            "Unable to load departments. Check that the API and database are running, then retry.",
+          );
         }
       })
       .finally(() => {
@@ -220,7 +225,7 @@ function RegisterPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [departmentLoadAttempt]);
 
   if (isRestoring) {
     return <LoadingPage />;
@@ -280,11 +285,26 @@ function RegisterPage() {
           required
           value={departmentId}
         >
+          {departments.length === 0 && (
+            <option value="">
+              {isLoadingDepartments ? "Loading departments…" : "Departments unavailable"}
+            </option>
+          )}
           {departments.map((department) => (
             <option key={department.id} value={department.id}>{department.name}</option>
           ))}
         </select>
         {departmentError && <p className="form-error" role="alert">{departmentError}</p>}
+        {departmentError && (
+          <button
+            className="button button-small button-outline"
+            disabled={isLoadingDepartments}
+            onClick={() => setDepartmentLoadAttempt((attempt) => attempt + 1)}
+            type="button"
+          >
+            Retry loading departments
+          </button>
+        )}
         <label htmlFor="password">Password</label>
         <input
           autoComplete="new-password"

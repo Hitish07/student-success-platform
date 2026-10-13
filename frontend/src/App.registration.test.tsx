@@ -109,4 +109,23 @@ describe("student registration", () => {
     const error = await screen.findByRole("alert");
     expect(error.textContent).toContain("An account with this email already exists.");
   });
+
+  it("shows a department loading error and retries the request", async () => {
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new Error("API unavailable"))
+      .mockResolvedValueOnce(
+        jsonResponse([{ id: 1, name: "Computer Science", code: "CS" }]),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<MemoryRouter initialEntries={["/register"]}><App /></MemoryRouter>);
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "Unable to load departments. Check that the API and database are running, then retry.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading departments" }));
+
+    expect(await screen.findByRole("option", { name: "Computer Science" })).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });
