@@ -16,6 +16,7 @@ import {
   FacultyAssessments,
   FacultyAttendance,
   FacultyDashboard,
+  FacultyDoubts,
   FacultyFeedback,
   FacultyPortalLayout,
   FacultySupport,
@@ -672,6 +673,7 @@ function AppRoutes() {
           <Route element={<FacultyAssessments />} path="assessments" />
           <Route element={<FacultySupport />} path="support" />
           <Route element={<FacultyFeedback />} path="feedback" />
+          <Route element={<FacultyDoubts />} path="doubts" />
         </Route>
       </Route>
       <Route element={<RequirePortalRole role="dean" />}>

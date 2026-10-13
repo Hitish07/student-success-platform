@@ -747,12 +747,90 @@ function RetryState({ error, onRetry }: { error: string; onRetry: () => void }) 
   return <div className="student-state student-error" role="alert"><p>{error}</p><button className="button button-small button-outline" onClick={onRetry} type="button">Try again</button></div>;
 }
 
+interface DoubtQuestionView {
+  question: string;
+  answer_preview: string;
+  created_at: string;
+}
+
+interface DoubtTopicSummary {
+  subject_id: number;
+  subject_code: string;
+  subject_name: string;
+  total: number;
+  recent: DoubtQuestionView[];
+}
+
+interface FacultyDoubtsView {
+  topics: DoubtTopicSummary[];
+  total_doubts: number;
+}
+
+function FacultyDoubtsScreen() {
+  const doubts = useFacultyResource<FacultyDoubtsView>("/faculty/doubts");
+
+  return (
+    <>
+      <ScreenHeading
+        eyebrow="Student questions"
+        title="Doubts and questions"
+        description="Topics your students are asking about. Questions are shown without student names."
+      />
+      <section className="student-panel">
+        {doubts.data && (
+          <p className="student-state">
+            {doubts.data.total_doubts === 0
+              ? "No doubts have been asked in your subjects yet."
+              : `${doubts.data.total_doubts} question${doubts.data.total_doubts === 1 ? "" : "s"} across ${doubts.data.topics.length} subject${doubts.data.topics.length === 1 ? "" : "s"}.`}
+          </p>
+        )}
+        <ScreenState
+          emptyMessage="No doubts have been asked in your subjects yet."
+          error={doubts.error}
+          isEmpty={!doubts.data || doubts.data.topics.length === 0}
+          isLoading={doubts.isLoading}
+          onRetry={doubts.reload}
+        >
+          {doubts.data && doubts.data.topics.length > 0 && (
+            <div className="feedback-list">
+              {doubts.data.topics.map((topic) => (
+                <article className="feedback-card" key={topic.subject_id}>
+                  <div className="feedback-meta">
+                    <strong>{topic.subject_code} - {topic.subject_name}</strong>
+                    <span>{topic.total} question{topic.total === 1 ? "" : "s"}</span>
+                  </div>
+                  <ul>
+                    {topic.recent.map((item, index) => (
+                      <li key={`${topic.subject_id}-${index}`}>
+                        <p><strong>Q:</strong> {item.question}</p>
+                        <p><strong>A:</strong> {item.answer_preview}</p>
+                        <p className="student-state">{formatTimestamp(item.created_at)}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
+            </div>
+          )}
+        </ScreenState>
+      </section>
+    </>
+  );
+}
+
+function formatTimestamp(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString();
+}
+
 const facultyNavigation = [
   { to: "/faculty", label: "Overview", end: true },
   { to: "/faculty/attendance", label: "Attendance", end: false },
   { to: "/faculty/assessments", label: "Assessments", end: false },
   { to: "/faculty/support", label: "Student support", end: false },
   { to: "/faculty/feedback", label: "Feedback", end: false },
+  { to: "/faculty/doubts", label: "Doubts", end: false },
 ];
 
 export function FacultyPortalLayout() {
@@ -786,3 +864,4 @@ export const FacultyAttendance = AttendanceScreen;
 export const FacultyAssessments = AssessmentScreen;
 export const FacultySupport = SupportScreen;
 export const FacultyFeedback = FeedbackScreen;
+export const FacultyDoubts = FacultyDoubtsScreen;
