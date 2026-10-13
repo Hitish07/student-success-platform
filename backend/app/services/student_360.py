@@ -43,6 +43,14 @@ DOUBTS_LIMIT = 5
 SUBMISSIONS_LIMIT = 5
 
 
+def _to_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def _faculty_subject_ids(db: Session, faculty: User) -> list[int]:
     return list(
         db.execute(
@@ -165,7 +173,7 @@ def _journey(db: Session, student_id: int) -> list[Student360JourneyEvent]:
     for enrollment, course, _faculty in repository.enrolled_courses(db, student_id):
         events.append(
             Student360JourneyEvent(
-                occurred_at=enrollment.enrolled_at,
+                occurred_at=_to_utc(enrollment.enrolled_at),
                 event_type="course",
                 title=f"Enrolled in {course.name}",
                 description=f"{course.code}",
@@ -185,7 +193,7 @@ def _journey(db: Session, student_id: int) -> list[Student360JourneyEvent]:
         )
 
     for mark, assessment, course in repository.student_marks(db, student_id):
-        submitted_at = mark.submitted_at or datetime.combine(
+        submitted_at = _to_utc(mark.submitted_at) or datetime.combine(
             assessment.due_date, datetime.min.time(), timezone.utc
         )
         state = "Submitted" if mark.is_submitted else "Missed"
@@ -217,7 +225,7 @@ def _journey(db: Session, student_id: int) -> list[Student360JourneyEvent]:
     for feedback, faculty, course in repository.received_feedback(db, student_id):
         events.append(
             Student360JourneyEvent(
-                occurred_at=feedback.created_at,
+                occurred_at=_to_utc(feedback.created_at),
                 event_type="feedback",
                 title=f"Feedback from {faculty.full_name}",
                 description=(
