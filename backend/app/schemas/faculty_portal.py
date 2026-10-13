@@ -198,3 +198,56 @@ class DoubtTopicSummary(BaseModel):
 class FacultyDoubtsView(BaseModel):
     topics: list[DoubtTopicSummary]
     total_doubts: int
+
+
+class Student360Header(BaseModel):
+    student_id: int
+    full_name: str
+    email: str
+    department: str | None
+    year: int
+    semester: int
+
+
+class Student360Risk(BaseModel):
+    score: float | None
+    level: str | None
+    computed_at: datetime | None
+
+
+class Student360Metrics(BaseModel):
+    attendance_percentage: float | None
+    marks_percentage: float | None
+    pending_assignments: int
+    submitted_assignments: int
+
+
+class Student360JourneyEvent(BaseModel):
+    occurred_at: datetime
+    event_type: str
+    title: str
+    description: str
+
+
+class Student360Doubt(BaseModel):
+    subject_code: str
+    subject_name: str
+    asked_at: datetime
+
+
+class Student360Submission(BaseModel):
+    assignment_title: str
+    subject_code: str
+    submitted_at: datetime | None
+    marks: float | None
+    max_marks: float
+    tab_switches: int
+
+
+class Student360View(BaseModel):
+    header: Student360Header
+    risk: Student360Risk
+    metrics: Student360Metrics
+    journey: list[Student360JourneyEvent]
+    doubts: list[Student360Doubt]
+    submissions: list[Student360Submission]
