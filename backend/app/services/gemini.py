@@ -63,12 +63,24 @@ class GeminiError(RuntimeError):
     """Raised when the Gemini API call fails or returns nothing usable."""
 
 
-def _build_payload(question: str, subject_label: str, extra_instruction: str) -> dict:
-    system = SYSTEM_INSTRUCTION
-    if subject_label:
-        system += f"\nThe student is asking in the context of: {subject_label}."
-    if extra_instruction:
-        system += extra_instruction
+def _build_payload(
+    question: str,
+    subject_label: str,
+    extra_instruction: str,
+    system_override: str | None = None,
+) -> dict:
+    if system_override is not None:
+        system = system_override
+        if subject_label:
+            system += f"\nContext: {subject_label}."
+        if extra_instruction:
+            system += extra_instruction
+    else:
+        system = SYSTEM_INSTRUCTION
+        if subject_label:
+            system += f"\nThe student is asking in the context of: {subject_label}."
+        if extra_instruction:
+            system += extra_instruction
 
     return {
         "system_instruction": {"parts": [{"text": system}]},
@@ -97,12 +109,17 @@ def _post_once(model: str, payload: dict, key: str) -> tuple[int, str]:
     return response.status_code, response.text
 
 
-def _post(question: str, subject_label: str, extra_instruction: str = "") -> str:
+def _post(
+    question: str,
+    subject_label: str,
+    extra_instruction: str = "",
+    system_override: str | None = None,
+) -> str:
     key = settings.gemini_api_key
     if not key:
         raise GeminiError("GEMINI_API_KEY is not configured.")
 
-    payload = _build_payload(question, subject_label, extra_instruction)
+    payload = _build_payload(question, subject_label, extra_instruction, system_override)
     last_error = "unknown error"
 
     for model in MODEL_FALLBACKS:
@@ -147,3 +164,55 @@ def explain_logic(question: str, subject_label: str = "") -> str:
 def explain_logic_strict(question: str, subject_label: str = "") -> str:
     """Retry with an extra instruction that forbids code."""
     return _post(question, subject_label, extra_instruction=RETRY_SUFFIX)
+
+
+DASHBOARD_SYSTEM_INSTRUCTION = (
+    "You are an analyst writing a short briefing for a college principal. "
+    "You are given academic and placement numbers for the institution. "
+    "Write ONE paragraph in plain English, under 120 words. Cover:\n"
+    "1. The overall academic trajectory (improving, flat, or declining).\n"
+    "2. The strongest and weakest departments by average marks.\n"
+    "3. The placement readiness picture.\n"
+    "4. One thing worth the principal's attention.\n"
+    "Rules: no bullet points, no headings, no numbers you were not given, "
+    "no opinions about individual students. Speak about departments and the "
+    "institution as a whole."
+)
+
+
+def _format_dashboard_stats(stats: dict) -> str:
+    lines: list[str] = []
+    lines.append(f"Total students: {stats.get('total_students', 0)}")
+    lines.append(f"Average attendance: {stats.get('average_attendance', 0)}%")
+    lines.append(f"Average marks: {stats.get('average_marks', 0)}%")
+    lines.append(
+        f"Placement readiness average: {stats.get('placement_readiness_average', 0)}"
+    )
+
+    institution = stats.get("academic_institution") or []
+    if institution:
+        lines.append("Institution academic average by month:")
+        for point in institution:
+            lines.append(f"  {point.get('month')}: {point.get('avg')}%")
+
+    departments = stats.get("departments") or []
+    for department in departments:
+        lines.append(f"Department {department.get('name')}:")
+        for month in department.get("months", []):
+            lines.append(f"  {month.get('month')}: {month.get('avg')}%")
+
+    return "\n".join(lines)
+
+
+def summarize_dashboard(stats: dict) -> str:
+    """Ask Gemini for a one-paragraph institutional summary.
+
+    Raises GeminiError on any failure. The caller is expected to catch it
+    and render the dashboard without a summary.
+    """
+    body = _format_dashboard_stats(stats)
+    prompt = (
+        "Here are the latest institution numbers. Write the briefing.\n\n"
+        + body
+    )
+    return _post(prompt, subject_label="", extra_instruction="")
