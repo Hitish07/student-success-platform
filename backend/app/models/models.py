@@ -512,3 +512,31 @@ class StudentDoubt(Base):
     question: Mapped[str] = mapped_column(Text, nullable=False)
     answer: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Placement(Base):
+    __tablename__ = "placements"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('offered', 'accepted', 'declined', 'joined')",
+            name="ck_placements_status",
+        ),
+        Index("ix_placements_student", "student_id", "offer_date"),
+        Index("ix_placements_offer_date", "offer_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    student_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    company: Mapped[str] = mapped_column(String(160), nullable=False)
+    role: Mapped[str] = mapped_column(String(160), nullable=False)
+    package_lpa: Mapped[Decimal | None] = mapped_column(Numeric(6, 2))
+    offer_date: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="offered", server_default="offered"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
