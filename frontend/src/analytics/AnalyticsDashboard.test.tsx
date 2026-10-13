@@ -79,6 +79,60 @@ const segment = {
   suggested_action: "Provide coding practice and mock interviews.",
 };
 
+const principalDashboard = {
+  total_students: 120,
+  average_attendance: 78.5,
+  average_marks: 68.2,
+  academic_trend: {
+    institution: [
+      { label: "2026-05", value: 65.0 },
+      { label: "2026-06", value: 68.0 },
+      { label: "2026-07", value: 72.0 },
+      { label: "2026-08", value: 70.0 },
+      { label: "2026-09", value: 73.0 },
+      { label: "2026-10", value: 75.0 },
+    ],
+    by_department: [
+      {
+        name: "Computer Science",
+        points: [
+          { label: "2026-05", value: 70.0 },
+          { label: "2026-06", value: 72.0 },
+          { label: "2026-07", value: 76.0 },
+          { label: "2026-08", value: 77.0 },
+          { label: "2026-09", value: 79.0 },
+          { label: "2026-10", value: 81.0 },
+        ],
+      },
+      {
+        name: "Mechanical",
+        points: [
+          { label: "2026-05", value: 60.0 },
+          { label: "2026-06", value: 62.0 },
+          { label: "2026-07", value: 64.0 },
+          { label: "2026-08", value: 61.0 },
+          { label: "2026-09", value: 63.0 },
+          { label: "2026-10", value: 62.0 },
+        ],
+      },
+    ],
+    overall_average: 71.4,
+  },
+  placement_readiness: {
+    points: [
+      { label: "2026-05", value: 0.0 },
+      { label: "2026-06", value: 0.0 },
+      { label: "2026-07", value: 0.0 },
+      { label: "2026-08", value: 0.0 },
+      { label: "2026-09", value: 0.0 },
+      { label: "2026-10", value: 71.0 },
+    ],
+    overall_average: 71.0,
+    note: "Average of aptitude, coding, and mock interview scores.",
+  },
+  ai_summary: "Computer Science leads the campus with a rising average, while Mechanical has slipped slightly over the last quarter.",
+};
+
 function mockApi(options: { loginRole?: "dean" | "principal"; failScores?: boolean } = {}) {
   const role = options.loginRole ?? "dean";
   const user = {
@@ -112,6 +166,8 @@ function mockApi(options: { loginRole?: "dean" | "principal"; failScores?: boole
       body = { students: [segment], segment_counts: { [segment.segment]: 1 } };
     } else if (url.endsWith("/analytics/data-integration")) {
       body = integration;
+    } else if (url.endsWith("/principal/dashboard")) {
+      body = principalDashboard;
     }
     return Promise.resolve(new Response(JSON.stringify(body), {
       status,
@@ -183,4 +239,23 @@ describe("dean and principal analytics dashboard", () => {
     expect(await screen.findByText("Analytics service unavailable.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
   });
+
+  it("shows the AI briefing and headline numbers on the principal trends tab", async () => {
+    mockApi({ loginRole: "principal" });
+    render(<MemoryRouter initialEntries={["/principal"]}><App /></MemoryRouter>);
+
+    await screen.findByRole("heading", { name: "Campus success dashboard" });
+    fireEvent.click(screen.getByRole("button", { name: "Institution trends" }));
+
+    expect(await screen.findByText(/Computer Science leads the campus/)).toBeTruthy();
+    expect(screen.getByText("Total students")).toBeTruthy();
+    expect(screen.getByText("120")).toBeTruthy();
+    expect(screen.getByText("Average attendance")).toBeTruthy();
+    expect(screen.getByText("78.5")).toBeTruthy();
+    expect(screen.getByText("Average marks")).toBeTruthy();
+    expect(screen.getByText("68.2")).toBeTruthy();
+    expect(screen.getAllByText("Placement readiness").length).toBeGreaterThan(0);
+    expect(screen.getByText("71.0")).toBeTruthy();
+  });
+
 });
