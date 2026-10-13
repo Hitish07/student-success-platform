@@ -378,6 +378,8 @@ function RegisterPage() {
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
   const [departmentId, setDepartmentId] = useState("");
+  const [year, setYear] = useState("1");
+  const [semester, setSemester] = useState("1");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
@@ -427,6 +429,8 @@ function RegisterPage() {
         full_name: fullName,
         password,
         department_id: Number(departmentId),
+        year: Number(year),
+        semester: Number(semester),
       });
       navigate(portalPaths[registeredUser.role], { replace: true });
     } catch (cause) {
@@ -451,6 +455,18 @@ function RegisterPage() {
           required
           value={fullName}
         />
+        <label htmlFor="year">Year</label>
+        <select id="year" onChange={(event) => setYear(event.target.value)} required value={year}>
+          {[1, 2, 3, 4].map((option) => (
+            <option key={option} value={option}>Year {option}</option>
+          ))}
+        </select>
+        <label htmlFor="semester">Semester</label>
+        <select id="semester" onChange={(event) => setSemester(event.target.value)} required value={semester}>
+          {[1, 2].map((option) => (
+            <option key={option} value={option}>Semester {option}</option>
+          ))}
+        </select>
         <label htmlFor="email">Institution email</label>
         <input
           autoComplete="email"

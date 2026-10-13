@@ -337,7 +337,7 @@ function MyAcademics() {
                           <tr key={subject.code}>
                             <td>{subject.code}</td>
                             <td>{subject.name}</td>
-                            <td>{subject.faculty.length ? subject.faculty.join(", ") : "Not assigned"}</td>
+                            <td>{subject.faculty.length ? subject.faculty.join(", ") : "Faculty not assigned yet"}</td>
                           </tr>
                         ))}
                       </tbody>

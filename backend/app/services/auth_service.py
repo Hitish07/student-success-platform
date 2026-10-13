@@ -14,6 +14,7 @@ from app.models import (
     Department,
     FacultyProfile,
     FacultySubject,
+    StudentProfile,
     Subject,
     User,
 )
@@ -89,6 +90,14 @@ def register_student(db: Session, payload: StudentRegistration) -> dict[str, Any
     )
     db.add(user)
     db.flush()
+    db.add(
+        StudentProfile(
+            user_id=user.id,
+            department_id=department.id,
+            year=payload.year,
+            semester=payload.semester,
+        )
+    )
     token_pair = _issue_token_pair(db, user)
     db.commit()
     return token_pair

@@ -52,6 +52,8 @@ export interface StudentRegistrationInput {
   full_name: string;
   password: string;
   department_id: number;
+  year: number;
+  semester: number;
 }
 
 export interface FacultyRegistrationInput {

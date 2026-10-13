@@ -70,6 +70,8 @@ def test_registration_creates_student_and_rejects_client_role(client, demo_users
         "full_name": "New Student",
         "password": DEMO_PASSWORD,
         "department_id": department_id,
+        "year": 2,
+        "semester": 1,
     }
 
     response = client.post("/auth/register", json=payload)

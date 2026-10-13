@@ -23,6 +23,8 @@ class StudentRegistration(StrictSchema):
     full_name: str = Field(min_length=1, max_length=160)
     password: str = Field(min_length=12, max_length=72)
     department_id: int = Field(gt=0)
+    year: int = Field(ge=1, le=4)
+    semester: int = Field(ge=1, le=2)
 
     @field_validator("full_name")
     @classmethod

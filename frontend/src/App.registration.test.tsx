@@ -78,6 +78,8 @@ describe("student registration", () => {
           full_name: "New Student",
           password: "LongDemoPassword123!",
           department_id: 1,
+          year: 1,
+          semester: 1,
         }),
       }),
     );
