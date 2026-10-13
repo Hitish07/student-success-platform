@@ -1,6 +1,11 @@
 from fastapi import APIRouter, Depends, status
 
 from app.api.dependencies import AuthenticatedUser, DatabaseSession, require_roles
+from app.schemas.placements import (
+    PlacementCreate,
+    PlacementCreateResponse,
+    PlacementView,
+)
 from app.schemas.faculty_portal import (
     AlertView,
     AssessmentCreate,
@@ -38,6 +43,7 @@ from app.services import assignments as assignments_service
 from app.services import faculty_portal as service
 from app.services.doubts import get_faculty_doubt_summary
 from app.services.student_360 import get_student_360
+from app.services.placements import create_placement, list_placements
 
 router = APIRouter(
     prefix="/faculty",
@@ -297,3 +303,24 @@ def faculty_student_360(
     db: DatabaseSession,
 ) -> Student360View:
     return get_student_360(db, user, student_id)
+
+
+@router.get("/placements", response_model=list[PlacementView])
+def faculty_placements(
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> list[PlacementView]:
+    return list_placements(db, user)
+
+
+@router.post(
+    "/placements",
+    response_model=PlacementCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_faculty_placement(
+    payload: PlacementCreate,
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> PlacementCreateResponse:
+    return create_placement(db, user, payload)
