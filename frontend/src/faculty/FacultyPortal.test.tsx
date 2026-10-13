@@ -84,6 +84,8 @@ function installFacultyApi(mode: "populated" | "empty" | "error" = "populated") 
             },
           ],
         };
+      } else if (url.endsWith("/faculty/placements")) {
+        body = [];
       } else if (url.endsWith("/faculty/doubts")) {
         body = mode === "empty"
           ? { topics: [], total_doubts: 0 }
@@ -197,6 +199,22 @@ describe("faculty portal", () => {
     expect(screen.getByText("Submitted - Midterm")).toBeTruthy();
     expect(screen.getByText("CS201 - Data Structures")).toBeTruthy();
     expect(screen.getByText("Stacks worksheet")).toBeTruthy();
+  });
+
+
+  it("shows the placements screen with a record form", async () => {
+    installFacultyApi("populated");
+
+    render(
+      <MemoryRouter initialEntries={["/faculty/placements"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Placements" })).toBeTruthy();
+    expect(await screen.findByText("Record a placement")).toBeTruthy();
+    expect(await screen.findByText("Recorded placements")).toBeTruthy();
+    expect(await screen.findByText("No placements recorded yet.")).toBeTruthy();
   });
 
 });
