@@ -59,6 +59,19 @@ interface AcademicSubjects {
   subjects: AcademicSubject[];
 }
 
+interface StudentAssignment {
+  id: number;
+  subject_id: number;
+  subject_code: string;
+  subject_name: string;
+  title: string;
+  description: string | null;
+  due_date: string;
+  max_marks: number;
+  status: "open" | "overdue" | "submitted";
+  submitted_at: string | null;
+}
+
 interface JourneyEvent {
   occurred_at: string;
   event_type: string;
@@ -333,7 +346,91 @@ function MyAcademics() {
                 )}
               </ScreenState>
             </div>
+            <StudentAssignmentList />
           </>
+        )}
+      </ScreenState>
+    </section>
+  );
+}
+
+function StudentAssignmentList() {
+  const { accessToken } = useAuth();
+  const assignments = useStudentResource<StudentAssignment[]>("/student/assignments");
+  const [submittingId, setSubmittingId] = useState<number | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+
+  async function submit(assignmentId: number) {
+    setSubmittingId(assignmentId);
+    setSubmitError(null);
+    setSubmitMessage(null);
+    try {
+      await apiRequest(`/student/assignments/${assignmentId}/submit`, {
+        method: "POST",
+      }, accessToken ?? undefined);
+      setSubmitMessage("Assignment submitted.");
+      assignments.reload();
+    } catch (cause) {
+      setSubmitError(cause instanceof Error ? cause.message : "Unable to submit this assignment.");
+    } finally {
+      setSubmittingId(null);
+    }
+  }
+
+  return (
+    <section aria-labelledby="student-assignments-heading" className="academic-subjects">
+      <h3 id="student-assignments-heading">Assignments</h3>
+      {submitError && <p className="form-error" role="alert">{submitError}</p>}
+      {submitMessage && <p className="form-success" role="status">{submitMessage}</p>}
+      <ScreenState
+        emptyMessage="There are no assignments for your current subjects."
+        error={assignments.error}
+        isEmpty={!assignments.data || assignments.data.length === 0}
+        isLoading={assignments.isLoading}
+        onRetry={assignments.reload}
+      >
+        {assignments.data && assignments.data.length > 0 && (
+          <div className="academic-table-scroll">
+            <table className="academic-table">
+              <thead>
+                <tr>
+                  <th scope="col">Subject</th>
+                  <th scope="col">Assignment</th>
+                  <th scope="col">Due date</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {assignments.data.map((assignment) => (
+                  <tr key={assignment.id}>
+                    <td>{assignment.subject_code} · {assignment.subject_name}</td>
+                    <td>
+                      <strong>{assignment.title}</strong>
+                      {assignment.description && <span className="assignment-description">{assignment.description}</span>}
+                    </td>
+                    <td>{assignment.due_date}</td>
+                    <td>{assignment.status}</td>
+                    <td>
+                      <button
+                        className="button button-small button-outline"
+                        disabled={assignment.status === "submitted" || submittingId === assignment.id}
+                        onClick={() => void submit(assignment.id)}
+                        type="button"
+                      >
+                        {assignment.status === "submitted"
+                          ? "Submitted"
+                          : submittingId === assignment.id
+                            ? "Submitting…"
+                            : "Submit"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </ScreenState>
     </section>

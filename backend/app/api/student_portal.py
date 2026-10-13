@@ -12,6 +12,8 @@ from app.schemas.student_portal import (
     StudentJourney,
     StudentSubjects,
 )
+from app.schemas.assignments import AssignmentSubmissionView, StudentAssignmentView
+from app.services.assignments import get_student_assignments, submit_assignment
 from app.services.student_portal import (
     get_academic_profile,
     get_academic_subjects,
@@ -27,6 +29,27 @@ router = APIRouter(
     tags=["student portal"],
     dependencies=[Depends(require_roles("student"))],
 )
+
+
+@router.get("/assignments", response_model=list[StudentAssignmentView])
+def student_assignments(
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> list[StudentAssignmentView]:
+    return get_student_assignments(db, user)
+
+
+@router.post(
+    "/assignments/{assignment_id}/submit",
+    response_model=AssignmentSubmissionView,
+    status_code=status.HTTP_201_CREATED,
+)
+def submit_student_assignment(
+    assignment_id: int,
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> AssignmentSubmissionView:
+    return submit_assignment(db, user, assignment_id)
 
 
 @router.get("/profile", response_model=StudentAcademicProfile)

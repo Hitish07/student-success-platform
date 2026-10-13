@@ -25,6 +25,7 @@ import {
   roleLabels,
   useAuth,
   type Department,
+  type FacultyRegistrationInput,
   type UserRole,
 } from "./auth/AuthContext";
 import {
@@ -52,6 +53,7 @@ function Home() {
         <nav aria-label="Account">
           <Link className="nav-link" to="/login">Sign in</Link>
           <Link className="button button-small" to="/register">Create student account</Link>
+          <Link className="nav-link" to="/register/faculty">Faculty registration</Link>
         </nav>
       </header>
       <section className="welcome" aria-labelledby="welcome-title">
@@ -180,7 +182,188 @@ function LoginPage() {
       </section>
       <p className="auth-switch">
         Student without an account? <Link to="/register">Create one</Link>
+        {" · "}Faculty? <Link to="/register/faculty">Register here</Link>
       </p>
+    </AuthFrame>
+  );
+}
+
+function FacultyRegisterPage() {
+  const { register, user, isRestoring } = useAuth();
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [subjects, setSubjects] = useState<Array<{
+    id: number; code: string; name: string; year: number; semester: number;
+  }>>([]);
+  const [departmentId, setDepartmentId] = useState("");
+  const [subjectIds, setSubjectIds] = useState<number[]>([]);
+  const [isLoadingDepartments, setIsLoadingDepartments] = useState(true);
+  const [isLoadingSubjects, setIsLoadingSubjects] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let mounted = true;
+    apiRequest<Department[]>("/auth/departments")
+      .then((rows) => {
+        if (mounted) {
+          setDepartments(rows);
+          setDepartmentId(String(rows[0]?.id ?? ""));
+        }
+      })
+      .catch((cause: unknown) => {
+        if (mounted) {
+          setLoadError(cause instanceof Error ? cause.message : "Unable to load departments.");
+        }
+      })
+      .finally(() => {
+        if (mounted) setIsLoadingDepartments(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!departmentId) {
+      setSubjects([]);
+      setSubjectIds([]);
+      setIsLoadingSubjects(false);
+      return;
+    }
+    let mounted = true;
+    setIsLoadingSubjects(true);
+    setLoadError(null);
+    setSubjectIds([]);
+    apiRequest<Array<{ id: number; code: string; name: string; year: number; semester: number }>>(
+      `/auth/subjects?department_id=${departmentId}`,
+    )
+      .then((rows) => {
+        if (mounted) setSubjects(rows);
+      })
+      .catch((cause: unknown) => {
+        if (mounted) {
+          setLoadError(cause instanceof Error ? cause.message : "Unable to load department subjects.");
+        }
+      })
+      .finally(() => {
+        if (mounted) setIsLoadingSubjects(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [departmentId]);
+
+  if (isRestoring) return <LoadingPage />;
+  if (user) return <Navigate to={portalPaths[user.role]} replace />;
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const input: FacultyRegistrationInput = {
+        name,
+        email,
+        password,
+        department_id: Number(departmentId),
+        subject_ids: subjectIds,
+      };
+      const registeredUser = await register(input);
+      navigate(portalPaths[registeredUser.role], { replace: true });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to create your faculty account.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <AuthFrame>
+      <p className="eyebrow">Faculty access</p>
+      <h1 className="auth-title">Register as faculty</h1>
+      <p className="auth-copy">Choose your department and the subjects you teach.</p>
+      <form className="auth-form" onSubmit={handleSubmit}>
+        <label htmlFor="faculty-name">Full name</label>
+        <input
+          autoComplete="name"
+          id="faculty-name"
+          maxLength={160}
+          onChange={(event) => setName(event.target.value)}
+          required
+          value={name}
+        />
+        <label htmlFor="faculty-email">Institution email</label>
+        <input
+          autoComplete="email"
+          id="faculty-email"
+          onChange={(event) => setEmail(event.target.value)}
+          required
+          type="email"
+          value={email}
+        />
+        <label htmlFor="faculty-department">Department</label>
+        <select
+          disabled={isLoadingDepartments || departments.length === 0}
+          id="faculty-department"
+          onChange={(event) => setDepartmentId(event.target.value)}
+          required
+          value={departmentId}
+        >
+          {departments.map((department) => (
+            <option key={department.id} value={department.id}>{department.name}</option>
+          ))}
+        </select>
+        <label htmlFor="faculty-subjects">Subjects you teach</label>
+        <select
+          disabled={isLoadingSubjects || subjects.length === 0}
+          id="faculty-subjects"
+          multiple
+          onChange={(event) => setSubjectIds(
+            Array.from(event.currentTarget.selectedOptions, (option) => Number(option.value)),
+          )}
+          required
+          size={Math.min(8, Math.max(3, subjects.length))}
+          value={subjectIds.map(String)}
+        >
+          {subjects.map((subject) => (
+            <option key={subject.id} value={subject.id}>
+              {subject.code} · {subject.name} (Year {subject.year}, Semester {subject.semester})
+            </option>
+          ))}
+        </select>
+        <p className="field-hint">Use Ctrl or Command to choose multiple subjects.</p>
+        {loadError && <p className="form-error" role="alert">{loadError}</p>}
+        {isLoadingSubjects && <p role="status">Loading department subjects…</p>}
+        {!isLoadingSubjects && departmentId && subjects.length === 0 && (
+          <p className="student-state">No subjects are available for this department.</p>
+        )}
+        <label htmlFor="faculty-password">Password</label>
+        <input
+          autoComplete="new-password"
+          id="faculty-password"
+          maxLength={72}
+          minLength={12}
+          onChange={(event) => setPassword(event.target.value)}
+          required
+          type="password"
+          value={password}
+        />
+        <p className="field-hint">Use at least 12 characters (maximum 72 UTF-8 bytes).</p>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <button
+          className="button"
+          disabled={isSubmitting || isLoadingDepartments || isLoadingSubjects || subjects.length === 0 || subjectIds.length === 0}
+          type="submit"
+        >
+          {isSubmitting ? "Creating account…" : "Create faculty account"}
+        </button>
+      </form>
+      <p className="auth-switch">Already registered? <Link to="/login">Sign in</Link></p>
     </AuthFrame>
   );
 }
@@ -452,6 +635,7 @@ function AppRoutes() {
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/register/faculty" element={<FacultyRegisterPage />} />
       <Route element={<RequirePortalRole role="student" />}>
         <Route element={<StudentPortalLayout />} path="/student">
           <Route element={<StudentDashboard />} index />

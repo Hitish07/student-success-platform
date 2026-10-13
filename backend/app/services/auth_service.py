@@ -9,14 +9,31 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import create_token, decode_token, hash_password, verify_password
-from app.models import AuthRefreshToken, Department, User
-from app.schemas.auth import StudentRegistration
+from app.models import (
+    AuthRefreshToken,
+    Department,
+    FacultyProfile,
+    FacultySubject,
+    Subject,
+    User,
+)
+from app.schemas.auth import FacultyRegistration, StudentRegistration
 
 VALID_ROLES = {"student", "faculty", "dean", "principal"}
 
 
 def list_departments(db: Session) -> list[Department]:
     return list(db.scalars(select(Department).order_by(Department.name)).all())
+
+
+def list_department_subjects(db: Session, department_id: int) -> list[Subject]:
+    return list(
+        db.scalars(
+            select(Subject)
+            .where(Subject.department_id == department_id)
+            .order_by(Subject.year, Subject.semester, Subject.code)
+        ).all()
+    )
 
 
 def public_user(user: User) -> dict[str, Any]:
@@ -72,6 +89,44 @@ def register_student(db: Session, payload: StudentRegistration) -> dict[str, Any
     )
     db.add(user)
     db.flush()
+    token_pair = _issue_token_pair(db, user)
+    db.commit()
+    return token_pair
+
+
+def register_faculty(db: Session, payload: FacultyRegistration) -> dict[str, Any]:
+    department = db.get(Department, payload.department_id)
+    if department is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Select a valid department.")
+
+    subjects = list(
+        db.scalars(
+            select(Subject).where(
+                Subject.id.in_(payload.subject_ids),
+                Subject.department_id == department.id,
+            )
+        ).all()
+    )
+    if len(subjects) != len(payload.subject_ids):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Every selected subject must belong to the selected department.",
+        )
+
+    user = User(
+        email=str(payload.email).strip().lower(),
+        full_name=payload.name,
+        role="faculty",
+        department_id=department.id,
+        password_hash=hash_password(payload.password),
+    )
+    db.add(user)
+    db.flush()
+    db.add(FacultyProfile(user_id=user.id, department_id=department.id))
+    db.add_all(
+        FacultySubject(faculty_id=user.id, subject_id=subject.id)
+        for subject in subjects
+    )
     token_pair = _issue_token_pair(db, user)
     db.commit()
     return token_pair

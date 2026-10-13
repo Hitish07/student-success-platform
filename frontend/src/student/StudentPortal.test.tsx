@@ -50,6 +50,9 @@ function apiResponse(url: string) {
       },
     };
   }
+  if (url.endsWith("/student/assignments")) {
+    return { status: 200, body: [] };
+  }
   if (url.endsWith("/student/dashboard")) {
     return {
       status: 200,

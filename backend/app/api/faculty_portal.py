@@ -23,6 +23,8 @@ from app.schemas.faculty_portal import (
     StudentNoteView,
     SuccessResponse,
 )
+from app.schemas.assignments import AssignmentCreate, FacultyAssignmentView, FacultySubjectView, SubjectStudentView
+from app.services import assignments as assignments_service
 from app.services import faculty_portal as service
 
 router = APIRouter(
@@ -30,6 +32,44 @@ router = APIRouter(
     tags=["faculty portal"],
     dependencies=[Depends(require_roles("faculty"))],
 )
+
+
+@router.get("/my-subjects", response_model=list[FacultySubjectView])
+def faculty_subjects(user: AuthenticatedUser, db: DatabaseSession) -> list[FacultySubjectView]:
+    return assignments_service.get_faculty_subjects(db, user)
+
+
+@router.get(
+    "/subjects/{subject_id}/students",
+    response_model=list[SubjectStudentView],
+)
+def subject_students(
+    subject_id: int,
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> list[SubjectStudentView]:
+    return assignments_service.get_subject_students(db, user, subject_id)
+
+
+@router.post(
+    "/assignments",
+    response_model=FacultyAssignmentView,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_assignment(
+    payload: AssignmentCreate,
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> FacultyAssignmentView:
+    return assignments_service.create_assignment(db, user, payload)
+
+
+@router.get("/assignments", response_model=list[FacultyAssignmentView])
+def faculty_assignments(
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> list[FacultyAssignmentView]:
+    return assignments_service.get_faculty_assignments(db, user)
 
 
 @router.get("/dashboard", response_model=FacultyDashboard)

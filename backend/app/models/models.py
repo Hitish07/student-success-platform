@@ -124,6 +124,53 @@ class AuthRefreshToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class Assignment(Base):
+    __tablename__ = "assignments"
+    __table_args__ = (
+        CheckConstraint("max_marks > 0", name="ck_assignments_max_marks_positive"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    subject_id: Mapped[int] = mapped_column(
+        ForeignKey("subjects.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    faculty_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    due_date: Mapped[date] = mapped_column(Date, nullable=False)
+    max_marks: Mapped[Decimal] = mapped_column(Numeric(8, 2), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AssignmentSubmission(Base):
+    __tablename__ = "assignment_submissions"
+    __table_args__ = (
+        UniqueConstraint(
+            "assignment_id",
+            "student_id",
+            name="uq_assignment_submissions_assignment_student",
+        ),
+        CheckConstraint("marks IS NULL OR marks >= 0", name="ck_assignment_submissions_marks_nonnegative"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    assignment_id: Mapped[int] = mapped_column(
+        ForeignKey("assignments.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    student_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    marks: Mapped[Decimal | None] = mapped_column(Numeric(8, 2))
+    feedback: Mapped[str | None] = mapped_column(Text)
+
+
 class Course(Base):
     __tablename__ = "courses"
     __table_args__ = (CheckConstraint("credits > 0", name="ck_courses_credits_positive"),)

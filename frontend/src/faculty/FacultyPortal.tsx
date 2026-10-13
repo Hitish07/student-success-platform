@@ -28,6 +28,32 @@ interface FacultyStudent {
   latest_risk_level: "low" | "medium" | "high" | null;
 }
 
+interface AcademicSubject {
+  id: number;
+  code: string;
+  name: string;
+  year: number;
+  semester: number;
+}
+
+interface AcademicStudent {
+  id: number;
+  full_name: string;
+  email: string;
+}
+
+interface AcademicAssignment {
+  id: number;
+  subject_id: number;
+  subject_code: string;
+  subject_name: string;
+  title: string;
+  description: string | null;
+  due_date: string;
+  max_marks: number;
+  created_at: string;
+}
+
 interface Resource<T> {
   data: T | null;
   isLoading: boolean;
@@ -176,7 +202,177 @@ function DashboardScreen() {
           </>
         )}
       </ScreenState>
+      <FacultyAssignmentsSection />
     </>
+  );
+}
+
+function FacultyAssignmentsSection() {
+  const { accessToken } = useAuth();
+  const subjects = useFacultyResource<AcademicSubject[]>("/faculty/my-subjects");
+  const assignments = useFacultyResource<AcademicAssignment[]>("/faculty/assignments");
+  const [selectedSubjectId, setSelectedSubjectId] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [dueDate, setDueDate] = useState(
+    new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+  );
+  const [maxMarks, setMaxMarks] = useState("100");
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const subject = subjects.data?.find((item) => String(item.id) === selectedSubjectId)
+    ?? subjects.data?.[0]
+    ?? null;
+  const students = useFacultyResource<AcademicStudent[]>(
+    subject ? `/faculty/subjects/${subject.id}/students` : null,
+  );
+
+  async function submitAssignment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!subject) return;
+    setIsSaving(true);
+    setSaveError(null);
+    setSuccess(null);
+    try {
+      await apiRequest<AcademicAssignment>("/faculty/assignments", {
+        method: "POST",
+        body: JSON.stringify({
+          subject_id: subject.id,
+          title,
+          description: description || null,
+          due_date: dueDate,
+          max_marks: Number(maxMarks),
+        }),
+      }, accessToken ?? undefined);
+      setTitle("");
+      setDescription("");
+      setSuccess("Assignment created.");
+      assignments.reload();
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : "Unable to create the assignment.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <section aria-labelledby="academic-faculty-heading" className="student-panel">
+      <p className="eyebrow">Academic subjects</p>
+      <h2 id="academic-faculty-heading">My subjects and assignments</h2>
+      <ScreenState
+        emptyMessage="No academic subjects are assigned to your account."
+        error={subjects.error}
+        isEmpty={!subjects.data || subjects.data.length === 0}
+        isLoading={subjects.isLoading}
+        onRetry={subjects.reload}
+      >
+        {subjects.data && subjects.data.length > 0 && subject && (
+          <>
+            <label className="faculty-picker" htmlFor="academic-faculty-subject">
+              Subject
+              <select
+                id="academic-faculty-subject"
+                onChange={(event) => setSelectedSubjectId(event.target.value)}
+                value={selectedSubjectId || String(subject.id)}
+              >
+                {subjects.data.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.code} · {item.name} (Year {item.year}, Semester {item.semester})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="faculty-academic-grid">
+              <section aria-labelledby="faculty-roster-heading">
+                <h3 id="faculty-roster-heading">Students in this subject</h3>
+                <ScreenState
+                  emptyMessage="No students match this subject's department, year, and semester."
+                  error={students.error}
+                  isEmpty={!students.data || students.data.length === 0}
+                  isLoading={students.isLoading}
+                  onRetry={students.reload}
+                >
+                  {students.data && students.data.length > 0 && (
+                    <ul className="faculty-student-list">
+                      {students.data.map((student) => (
+                        <li key={student.id}>
+                          <strong>{student.full_name}</strong>
+                          <span>{student.email}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </ScreenState>
+              </section>
+              <form className="academic-assignment-form" onSubmit={submitAssignment}>
+                <h3>Post an assignment</h3>
+                <label htmlFor="assignment-title">Title</label>
+                <input
+                  id="assignment-title"
+                  maxLength={200}
+                  onChange={(event) => setTitle(event.target.value)}
+                  required
+                  value={title}
+                />
+                <label htmlFor="assignment-description">Description</label>
+                <textarea
+                  id="assignment-description"
+                  maxLength={5000}
+                  onChange={(event) => setDescription(event.target.value)}
+                  rows={3}
+                  value={description}
+                />
+                <label htmlFor="assignment-due-date">Due date</label>
+                <input
+                  id="assignment-due-date"
+                  onChange={(event) => setDueDate(event.target.value)}
+                  required
+                  type="date"
+                  value={dueDate}
+                />
+                <label htmlFor="assignment-max-marks">Maximum marks</label>
+                <input
+                  id="assignment-max-marks"
+                  min="0.01"
+                  onChange={(event) => setMaxMarks(event.target.value)}
+                  required
+                  step="0.01"
+                  type="number"
+                  value={maxMarks}
+                />
+                {saveError && <p className="form-error" role="alert">{saveError}</p>}
+                {success && <p className="form-success" role="status">{success}</p>}
+                <button className="button button-small" disabled={isSaving} type="submit">
+                  {isSaving ? "Posting…" : "Post assignment"}
+                </button>
+              </form>
+            </div>
+          </>
+        )}
+      </ScreenState>
+      <div className="academic-assignment-list">
+        <h3>Your assignments</h3>
+        <ScreenState
+          emptyMessage="You have not posted any assignments yet."
+          error={assignments.error}
+          isEmpty={!assignments.data || assignments.data.length === 0}
+          isLoading={assignments.isLoading}
+          onRetry={assignments.reload}
+        >
+          {assignments.data && assignments.data.length > 0 && (
+            <ul className="faculty-student-list">
+              {assignments.data.map((item) => (
+                <li key={item.id}>
+                  <strong>{item.title} · {item.subject_code}</strong>
+                  <span>Due {item.due_date} · {item.max_marks} marks</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </ScreenState>
+      </div>
+    </section>
   );
 }
 

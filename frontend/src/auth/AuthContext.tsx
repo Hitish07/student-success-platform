@@ -43,10 +43,23 @@ interface AuthContextValue {
   user: UserProfile | null;
   isRestoring: boolean;
   login: (email: string, password: string) => Promise<UserProfile>;
-  register: (
-    input: { email: string; full_name: string; password: string; department_id: number },
-  ) => Promise<UserProfile>;
+  register: (input: StudentRegistrationInput | FacultyRegistrationInput) => Promise<UserProfile>;
   logout: () => Promise<void>;
+}
+
+export interface StudentRegistrationInput {
+  email: string;
+  full_name: string;
+  password: string;
+  department_id: number;
+}
+
+export interface FacultyRegistrationInput {
+  name: string;
+  email: string;
+  password: string;
+  department_id: number;
+  subject_ids: number[];
 }
 
 const REFRESH_TOKEN_KEY = "student-success.refresh-token";
@@ -144,8 +157,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const register = useCallback(
-    async (input: { email: string; full_name: string; password: string; department_id: number }) => {
-      const response = await apiRequest<TokenResponse>("/auth/register", {
+    async (input: StudentRegistrationInput | FacultyRegistrationInput) => {
+      const endpoint = "subject_ids" in input ? "/auth/register/faculty" : "/auth/register";
+      const response = await apiRequest<TokenResponse>(endpoint, {
         method: "POST",
         body: JSON.stringify(input),
       });
