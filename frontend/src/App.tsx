@@ -12,6 +12,7 @@ import {
 
 import { apiRequest } from "./api";
 import { AnalyticsDashboard } from "./analytics/AnalyticsDashboard";
+import { StudentDetailScreen } from "./faculty/StudentDetailScreen";
 import {
   FacultyAssessments,
   FacultyAttendance,
@@ -674,6 +675,7 @@ function AppRoutes() {
           <Route element={<FacultySupport />} path="support" />
           <Route element={<FacultyFeedback />} path="feedback" />
           <Route element={<FacultyDoubts />} path="doubts" />
+          <Route element={<StudentDetailScreen />} path="students/:studentId" />
         </Route>
       </Route>
       <Route element={<RequirePortalRole role="dean" />}>

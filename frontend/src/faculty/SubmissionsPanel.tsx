@@ -1,10 +1,12 @@
 ﻿import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { apiRequest } from "../api";
 import { useAuth } from "../auth/AuthContext";
 
 interface GradingRow {
   id: number;
+  student_id: number;
   student_name: string;
   student_email: string;
   submitted_at: string;
@@ -57,7 +59,7 @@ function GradeRowEditor({ row, onSaved }: { row: GradingRow; onSaved: () => void
 
   return (
     <div style={{ display: "grid", gap: "0.5rem", padding: "0.75rem 0", borderTop: "1px solid #ddd" }}>
-      <strong>{row.student_name}</strong>
+      <strong><Link className="text-link" to={`/faculty/students/${row.student_id}`}>{row.student_name}</Link></strong>
       <span>{row.student_email} · submitted {new Date(row.submitted_at).toLocaleString()}</span>
       <span>Tab switches: {row.tab_switches} · Cancelled attempts: {row.redo_count}</span>
       <p style={{ whiteSpace: "pre-wrap" }}>{row.answer_text ?? "No answer text was saved for this submission."}</p>
