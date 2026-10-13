@@ -93,3 +93,24 @@ class SubmissionGradingView(BaseModel):
     marks: Decimal | None
     feedback: str | None
     max_marks: Decimal
+    tab_switches: int = 0
+    redo_count: int = 0
+
+
+class AttemptView(BaseModel):
+    attempt_id: int
+    assignment_id: int
+    tab_switches: int
+    limit: int
+    status: Literal["active", "voided", "submitted"]
+    voided_attempts: int
+
+
+class AttemptActivityView(BaseModel):
+    id: int
+    student_id: int
+    student_name: str
+    student_email: str
+    status: Literal["active", "voided", "submitted"]
+    tab_switches: int
+    started_at: datetime

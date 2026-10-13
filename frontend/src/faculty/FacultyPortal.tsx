@@ -150,6 +150,7 @@ function CoursePicker({
     <label className="faculty-picker">
       Course
       <select onChange={(event) => onChange(event.target.value)} value={value}>
+        <option value="">Choose a course...</option>
         {courses.map((course) => (
           <option key={course.id} value={course.id}>
             {course.code} · {course.name}
@@ -223,16 +224,17 @@ function FacultyAssignmentsSection() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const subject = subjects.data?.find((item) => String(item.id) === selectedSubjectId)
-    ?? subjects.data?.[0]
-    ?? null;
+  const subject = subjects.data?.find((item) => String(item.id) === selectedSubjectId) ?? null;
   const students = useFacultyResource<AcademicStudent[]>(
     subject ? `/faculty/subjects/${subject.id}/students` : null,
   );
 
   async function submitAssignment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!subject) return;
+    if (!subject) {
+      setSaveError("Choose a subject before posting an assignment.");
+      return;
+    }
     setIsSaving(true);
     setSaveError(null);
     setSuccess(null);
@@ -269,15 +271,16 @@ function FacultyAssignmentsSection() {
         isLoading={subjects.isLoading}
         onRetry={subjects.reload}
       >
-        {subjects.data && subjects.data.length > 0 && subject && (
+        {subjects.data && subjects.data.length > 0 && (
           <>
             <label className="faculty-picker" htmlFor="academic-faculty-subject">
               Subject
               <select
                 id="academic-faculty-subject"
                 onChange={(event) => setSelectedSubjectId(event.target.value)}
-                value={selectedSubjectId || String(subject.id)}
+                value={selectedSubjectId}
               >
+                <option value="">Choose a subject...</option>
                 {subjects.data.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.code} · {item.name} (Year {item.year}, Semester {item.semester})
@@ -345,7 +348,7 @@ function FacultyAssignmentsSection() {
                 />
                 {saveError && <p className="form-error" role="alert">{saveError}</p>}
                 {success && <p className="form-success" role="status">{success}</p>}
-                <button className="button button-small" disabled={isSaving} type="submit">
+                <button className="button button-small" disabled={isSaving || !selectedSubjectId} type="submit">
                   {isSaving ? "Posting…" : "Post assignment"}
                 </button>
               </form>
@@ -382,8 +385,7 @@ function FacultyAssignmentsSection() {
 function AttendanceScreen() {
   const dashboard = useDashboard();
   const [courseId, setCourseId] = useState("");
-  const course = dashboard.data?.courses.find((item) => String(item.id) === courseId)
-    ?? dashboard.data?.courses[0];
+  const course = dashboard.data?.courses.find((item) => String(item.id) === courseId) ?? null;
   const roster = useFacultyResource<FacultyStudent[]>(
     course ? `/faculty/courses/${course.id}/students` : null,
   );
@@ -400,7 +402,10 @@ function AttendanceScreen() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!course) return;
+    if (!course) {
+      setError("Choose a course before saving attendance.");
+      return;
+    }
     setError(null);
     setSuccess(null);
     setSaving(true);
@@ -433,7 +438,9 @@ function AttendanceScreen() {
               ? <p className="student-state">No assigned courses are available for attendance.</p>
               : (
                 <>
-                  <CoursePicker courses={dashboard.data.courses} onChange={setCourseId} value={course ? String(course.id) : ""} />
+                  <CoursePicker courses={dashboard.data.courses} onChange={setCourseId} value={courseId} />
+                  {!courseId && <p className="student-state">Choose a course to record attendance.</p>}
+                  {courseId && (
                   <ScreenState
                     emptyMessage="There are no enrolled students in this course."
                     error={roster.error}
@@ -457,10 +464,11 @@ function AttendanceScreen() {
                         </select>
                         {error && <p className="form-error" role="alert">{error}</p>}
                         {success && <p className="form-success" role="status">{success}</p>}
-                        <button className="button" disabled={saving || !studentId} type="submit">{saving ? "Saving…" : "Save attendance"}</button>
+                        <button className="button" disabled={saving || !studentId || !courseId} type="submit">{saving ? "Saving…" : "Save attendance"}</button>
                       </form>
                     )}
                   </ScreenState>
+                  )}
                 </>
               )}
       </section>
@@ -485,8 +493,7 @@ function AttendanceScreen() {
 function AssessmentScreen() {
   const dashboard = useDashboard();
   const [courseId, setCourseId] = useState("");
-  const course = dashboard.data?.courses.find((item) => String(item.id) === courseId)
-    ?? dashboard.data?.courses[0];
+  const course = dashboard.data?.courses.find((item) => String(item.id) === courseId) ?? null;
   const roster = useFacultyResource<FacultyStudent[]>(course ? `/faculty/courses/${course.id}/students` : null);
   const assessments = useFacultyResource<Array<{ id: number; title: string; assessment_type: string; max_score: number; due_date: string }>>(
     course ? `/faculty/courses/${course.id}/assessments` : null,
@@ -508,7 +515,10 @@ function AssessmentScreen() {
 
   async function save(event: FormEvent<HTMLFormElement>, kind: "assessment" | "mark") {
     event.preventDefault();
-    if (!course) return;
+    if (!course) {
+      setMutationError("Choose a course before saving.");
+      return;
+    }
     setSaving(true);
     setMutationError(null);
     setSuccess(null);
@@ -542,7 +552,7 @@ function AssessmentScreen() {
         {dashboard.isLoading ? <p className="student-state" role="status">Loading assigned courses…</p>
           : dashboard.error ? <RetryState error={dashboard.error} onRetry={dashboard.reload} />
             : !dashboard.data || dashboard.data.courses.length === 0 ? <p className="student-state">No assigned courses are available.</p>
-              : <CoursePicker courses={dashboard.data.courses} onChange={setCourseId} value={course ? String(course.id) : ""} />}
+              : <CoursePicker courses={dashboard.data.courses} onChange={setCourseId} value={courseId} />}
       </section>
       {course && (
         <>
@@ -555,7 +565,7 @@ function AssessmentScreen() {
               <label htmlFor="assessment-due">Due date</label><input id="assessment-due" onChange={(event) => setDueDate(event.target.value)} required type="date" value={dueDate} />
               {mutationError && <p className="form-error" role="alert">{mutationError}</p>}
               {success && <p className="form-success" role="status">{success}</p>}
-              <button className="button" disabled={saving} type="submit">{saving ? "Saving…" : "Create assessment"}</button>
+              <button className="button" disabled={saving || !courseId} type="submit">{saving ? "Saving…" : "Create assessment"}</button>
             </form>
           </section>
           <section className="student-panel">
@@ -612,7 +622,7 @@ function SupportScreen() {
   const atRisk = useFacultyResource<Array<{ student_id: number; student_name: string; course_codes: string[]; risk_score: number; risk_level: string; contributing_factors: Array<{ key: string; observation: string }>; open_alerts: number }>>("/faculty/at-risk");
   const alerts = useFacultyResource<Array<{ id: number; student_id: number; student_name: string; course_codes: string[]; alert_type: string; severity: string; status: string; created_at: string }>>("/faculty/alerts");
   const [courseId, setCourseId] = useState("");
-  const course = dashboard.data?.courses.find((item) => String(item.id) === courseId) ?? dashboard.data?.courses[0];
+  const course = dashboard.data?.courses.find((item) => String(item.id) === courseId) ?? null;
   const roster = useFacultyResource<FacultyStudent[]>(course ? `/faculty/courses/${course.id}/students` : null);
   const [studentId, setStudentId] = useState("");
   const notes = useFacultyResource<Array<{ id: number; content: string; author_name: string; created_at: string }>>(
@@ -682,7 +692,7 @@ function SupportScreen() {
           : dashboard.error ? <RetryState error={dashboard.error} onRetry={dashboard.reload} />
             : !dashboard.data || dashboard.data.courses.length === 0 ? <p className="student-state">No assigned courses are available.</p>
               : <>
-                <CoursePicker courses={dashboard.data.courses} onChange={(value) => { setCourseId(value); setStudentId(""); }} value={course ? String(course.id) : ""} />
+                <CoursePicker courses={dashboard.data.courses} onChange={(value) => { setCourseId(value); setStudentId(""); }} value={courseId} />
                 <ScreenState emptyMessage="This course has no enrolled students." error={roster.error} isEmpty={!roster.data || roster.data.length === 0} isLoading={roster.isLoading} onRetry={roster.reload}>
                   {roster.data && <label className="faculty-picker">Student<select onChange={(event) => setStudentId(event.target.value)} value={studentId}><option value="">Choose a student</option>{roster.data.map((student) => <option key={student.id} value={student.id}>{student.full_name}</option>)}</select></label>}
                 </ScreenState>

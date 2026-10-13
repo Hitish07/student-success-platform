@@ -170,6 +170,7 @@ class AssignmentSubmission(Base):
     marks: Mapped[Decimal | None] = mapped_column(Numeric(8, 2))
     feedback: Mapped[str | None] = mapped_column(Text)
     answer_text: Mapped[str | None] = mapped_column(Text)
+    tab_switches: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
 
 class Course(Base):
@@ -464,3 +465,29 @@ class PasswordResetToken(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AssignmentAttempt(Base):
+    __tablename__ = "assignment_attempts"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('active', 'voided', 'submitted')",
+            name="ck_assignment_attempts_status",
+        ),
+        CheckConstraint("tab_switches >= 0", name="ck_assignment_attempts_tab_switches"),
+        Index("ix_assignment_attempts_assignment_student", "assignment_id", "student_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    assignment_id: Mapped[int] = mapped_column(
+        ForeignKey("assignments.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    student_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="active", server_default="active")
+    tab_switches: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

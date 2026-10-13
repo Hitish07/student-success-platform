@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -23,7 +25,10 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = Field(default=7, gt=0)
     frontend_origin: str = "http://localhost:5173,http://127.0.0.1:5173"
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).resolve().parents[3] / ".env",
+        extra="ignore",
+    )
 
     @property
     def frontend_origins(self) -> list[str]:
