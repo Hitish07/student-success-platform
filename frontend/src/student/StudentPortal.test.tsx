@@ -130,6 +130,64 @@ function installSessionFetch() {
   return fetchMock;
 }
 
+function assignmentRow(answer: string | null) {
+  return {
+    id: 5,
+    subject_code: "CS201",
+    subject_name: "Data Structures",
+    title: "Stacks worksheet",
+    description: "Solve the stack problems.",
+    due_date: "2026-10-30",
+    max_marks: 20,
+    status: answer === null ? "open" : "submitted",
+    submitted_at: answer === null ? null : "2026-10-13T10:00:00Z",
+    answer_text: answer,
+  };
+}
+
+function installAssignmentFetch(options: { storedAnswer?: string; submitStatus?: number } = {}) {
+  sessionStorage.setItem("student-success.refresh-token", "stored-refresh-token");
+  let answer: string | null = options.storedAnswer ?? null;
+  const json = (body: unknown, status = 200) =>
+    Promise.resolve(
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+  const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.endsWith("/student/assignments")) {
+      return json([assignmentRow(answer)]);
+    }
+    if (url.endsWith("/student/assignments/5/submit")) {
+      if (options.submitStatus && options.submitStatus !== 201) {
+        return json({ detail: "Unable to submit right now." }, options.submitStatus);
+      }
+      answer = JSON.parse(String(init?.body)).answer_text;
+      return json({ id: 1 }, 201);
+    }
+    const response = apiResponse(url);
+    return json(response.body, response.status);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function submitCalls(fetchMock: ReturnType<typeof installAssignmentFetch>) {
+  return fetchMock.mock.calls.filter(
+    ([url, init]) => String(url).endsWith("/student/assignments/5/submit") && init?.method === "POST",
+  );
+}
+
+function renderStudentHome() {
+  render(
+    <MemoryRouter initialEntries={["/student"]}>
+      <App />
+    </MemoryRouter>,
+  );
+}
+
 afterEach(() => {
   cleanup();
   sessionStorage.clear();
@@ -319,5 +377,57 @@ describe("student portal screens", () => {
     expect(await screen.findByText("You have not received faculty feedback yet.")).toBeTruthy();
     expect(screen.getByText("You have not submitted feedback yet.")).toBeTruthy();
     expect(await screen.findByText("Dashboard temporarily unavailable.")).toBeTruthy();
+  });
+
+  it("opens an assignment, submits the written answer, and shows it read-only", async () => {
+    const fetchMock = installAssignmentFetch();
+    renderStudentHome();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open" }));
+    expect(screen.getByText("Solve the stack problems.")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Your answer"), { target: { value: "  Typed answer  " } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit assignment" }));
+
+    expect(await screen.findByText("Assignment submitted.")).toBeTruthy();
+    const calls = submitCalls(fetchMock);
+    expect(calls).toHaveLength(1);
+    expect(calls[0][1]?.body).toBe(JSON.stringify({ answer_text: "Typed answer" }));
+    expect(await screen.findByText("Typed answer")).toBeTruthy();
+    expect(screen.queryByLabelText("Your answer")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Submit assignment" })).toBeNull();
+  });
+
+  it("does not submit an empty assignment answer", async () => {
+    const fetchMock = installAssignmentFetch();
+    renderStudentHome();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open" }));
+    fireEvent.change(screen.getByLabelText("Your answer"), { target: { value: "   " } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit assignment" }));
+
+    expect(await screen.findByText("Write your answer before submitting.")).toBeTruthy();
+    expect(submitCalls(fetchMock)).toHaveLength(0);
+  });
+
+  it("shows a submitted assignment's answer without a submit form", async () => {
+    installAssignmentFetch({ storedAnswer: "Stored answer text" });
+    renderStudentHome();
+
+    fireEvent.click(await screen.findByRole("button", { name: "View" }));
+    expect(await screen.findByText("Stored answer text")).toBeTruthy();
+    expect(screen.queryByLabelText("Your answer")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Submit assignment" })).toBeNull();
+  });
+
+  it("shows the server error when an assignment submit fails", async () => {
+    installAssignmentFetch({ submitStatus: 503 });
+    renderStudentHome();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open" }));
+    fireEvent.change(screen.getByLabelText("Your answer"), { target: { value: "My answer" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit assignment" }));
+
+    expect(await screen.findByText("Unable to submit right now.")).toBeTruthy();
+    expect(screen.getByLabelText("Your answer")).toHaveProperty("value", "My answer");
   });
 });
