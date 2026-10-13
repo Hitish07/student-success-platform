@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(default=15, gt=0)
     refresh_token_expire_days: int = Field(default=7, gt=0)
     frontend_origin: str = "http://localhost:5173,http://127.0.0.1:5173"
+    gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[3] / ".env",
