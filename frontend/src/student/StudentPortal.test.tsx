@@ -111,6 +111,12 @@ function apiResponse(url: string) {
       body: { received: [], submitted: [] },
     };
   }
+  if (url.endsWith("/student/doubts")) {
+    return {
+      status: 200,
+      body: { doubts: [], remaining_today: 20 },
+    };
+  }
   return { status: 404, body: { detail: "Not found." } };
 }
 
@@ -477,4 +483,55 @@ describe("student portal screens", () => {
       fetchMock.mock.calls.some(([url]) => String(url).endsWith("/student/assignments/5/tab-switch")),
     ).toBe(true);
   });
+
+  it("asks a doubt and shows the plain-English answer", async () => {
+    sessionStorage.setItem("student-success.refresh-token", "stored-refresh-token");
+    let doubts: unknown[] = [];
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const json = (body: unknown, status = 200) =>
+        Promise.resolve(
+          new Response(JSON.stringify(body), {
+            status,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      if (url.endsWith("/student/doubts") && init?.method === "POST") {
+        const created = {
+          id: 1,
+          subject_id: 1,
+          subject_code: "CS201",
+          subject_name: "Data Structures",
+          question: "How do I think about recursion?",
+          answer: "Think about the base case, then about each step. Two approaches: iterative and recursive.",
+          created_at: "2026-10-13T10:00:00Z",
+        };
+        doubts = [created];
+        return json(created, 201);
+      }
+      if (url.endsWith("/student/doubts")) {
+        return json({ doubts, remaining_today: 19 });
+      }
+      const response = apiResponse(url);
+      return json(response.body, response.status);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <MemoryRouter initialEntries={["/student/doubts"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Ask a doubt")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "CS201" } });
+    fireEvent.change(screen.getByLabelText("Your question"), {
+      target: { value: "How do I think about recursion?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+
+    expect(await screen.findByText(/base case/i)).toBeTruthy();
+    expect(screen.getByText(/faculty can see the topics/i)).toBeTruthy();
+  });
+
 });
