@@ -12,8 +12,18 @@ from app.schemas.student_portal import (
     StudentJourney,
     StudentSubjects,
 )
-from app.schemas.assignments import AssignmentSubmissionView, AssignmentSubmit, StudentAssignmentView
-from app.services.assignments import get_student_assignments, submit_assignment
+from app.schemas.assignments import (
+    AssignmentSubmissionView,
+    AssignmentSubmit,
+    AttemptView,
+    StudentAssignmentView,
+)
+from app.services.assignments import (
+    get_student_assignments,
+    record_tab_switch,
+    start_attempt,
+    submit_assignment,
+)
 from app.services.student_portal import (
     get_academic_profile,
     get_academic_subjects,
@@ -116,3 +126,27 @@ def create_student_feedback(
 ) -> FeedbackSubmission:
     feedback_id = submit_feedback(db, user, payload)
     return FeedbackSubmission(id=feedback_id, message="Feedback submitted.")
+
+
+@router.post(
+    "/assignments/{assignment_id}/attempt",
+    response_model=AttemptView,
+)
+def start_assignment_attempt(
+    assignment_id: int,
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> AttemptView:
+    return start_attempt(db, user, assignment_id)
+
+
+@router.post(
+    "/assignments/{assignment_id}/tab-switch",
+    response_model=AttemptView,
+)
+def report_assignment_tab_switch(
+    assignment_id: int,
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> AttemptView:
+    return record_tab_switch(db, user, assignment_id)
