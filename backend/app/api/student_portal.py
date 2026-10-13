@@ -18,12 +18,14 @@ from app.schemas.assignments import (
     AttemptView,
     StudentAssignmentView,
 )
+from app.schemas.doubts import DoubtAsk, DoubtList, DoubtView
 from app.services.assignments import (
     get_student_assignments,
     record_tab_switch,
     start_attempt,
     submit_assignment,
 )
+from app.services.doubts import ask_doubt, list_doubts
 from app.services.student_portal import (
     get_academic_profile,
     get_academic_subjects,
@@ -150,3 +152,24 @@ def report_assignment_tab_switch(
     db: DatabaseSession,
 ) -> AttemptView:
     return record_tab_switch(db, user, assignment_id)
+
+
+@router.get("/doubts", response_model=DoubtList)
+def student_doubts(
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> DoubtList:
+    return list_doubts(db, user)
+
+
+@router.post(
+    "/doubts",
+    response_model=DoubtView,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_student_doubt(
+    payload: DoubtAsk,
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> DoubtView:
+    return ask_doubt(db, user, payload)
