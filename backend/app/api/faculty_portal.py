@@ -21,6 +21,7 @@ from app.schemas.faculty_portal import (
     StudentNoteCreate,
     StudentNoteUpdate,
     StudentNoteView,
+    FacultyDoubtsView,
     SuccessResponse,
 )
 from app.schemas.assignments import (
@@ -34,6 +35,7 @@ from app.schemas.assignments import (
 from app.schemas.assignments import AttemptActivityView
 from app.services import assignments as assignments_service
 from app.services import faculty_portal as service
+from app.services.doubts import get_faculty_doubt_summary
 
 router = APIRouter(
     prefix="/faculty",
@@ -273,3 +275,11 @@ def assignment_attempts(
     db: DatabaseSession,
 ) -> list[AttemptActivityView]:
     return assignments_service.get_assignment_attempts(db, user, assignment_id)
+
+
+@router.get("/doubts", response_model=FacultyDoubtsView)
+def faculty_doubts(
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> FacultyDoubtsView:
+    return get_faculty_doubt_summary(db, user)
