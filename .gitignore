@@ -8,3 +8,9 @@ __pycache__/
 .pytest_cache/
 *.sqlite
 credentials-*.csv
+
+*.db
+
+
+*.db
+
