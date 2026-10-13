@@ -5,6 +5,9 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Legend,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -16,7 +19,7 @@ import { apiRequest } from "../api";
 import { useAuth } from "../auth/AuthContext";
 
 type RiskLevel = "Low" | "Medium" | "High";
-type Section = "overview" | "segments" | "students" | "quality";
+type Section = "overview" | "segments" | "students" | "quality" | "trends";
 type SortKey = "student_name" | "success_score" | "data_completeness";
 
 interface Driver {
@@ -107,12 +110,18 @@ const RISK_COLORS: Record<RiskLevel, string> = {
   High: "#ca5144",
 };
 const SEGMENT_COLORS = ["#277c6c", "#3d83a3", "#825caf", "#d18a32", "#59727e"];
-const SECTIONS: { id: Section; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "segments", label: "Segments" },
-  { id: "students", label: "Students" },
-  { id: "quality", label: "Data quality" },
-];
+function sectionsFor(role: "dean" | "principal"): { id: Section; label: string }[] {
+  const base: { id: Section; label: string }[] = [
+    { id: "overview", label: "Overview" },
+    { id: "segments", label: "Segments" },
+    { id: "students", label: "Students" },
+    { id: "quality", label: "Data quality" },
+  ];
+  if (role === "principal") {
+    base.push({ id: "trends", label: "Institution trends" });
+  }
+  return base;
+}
 
 function useDashboardData() {
   const { accessToken } = useAuth();
@@ -343,6 +352,179 @@ function StudentDetail({
   );
 }
 
+interface TrendPoint {
+  label: string;
+  value: number;
+}
+
+interface SeriesLine {
+  name: string;
+  points: TrendPoint[];
+}
+
+interface PrincipalDashboardData {
+  total_students: number;
+  average_attendance: number;
+  average_marks: number;
+  academic_trend: {
+    institution: TrendPoint[];
+    by_department: SeriesLine[];
+    overall_average: number;
+  };
+  placement_readiness: {
+    points: TrendPoint[];
+    overall_average: number;
+    note: string;
+  };
+  ai_summary: string | null;
+}
+
+const DEPARTMENT_COLORS = [
+  "#277c6c", "#3d83a3", "#825caf", "#d18a32", "#59727e", "#b25a5a", "#4a7f3f",
+];
+
+function PrincipalTrendsPanel() {
+  const { accessToken } = useAuth();
+  const [data, setData] = useState<PrincipalDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+    apiRequest<PrincipalDashboardData>("/principal/dashboard", {}, accessToken ?? undefined)
+      .then((value) => {
+        if (active) setData(value);
+      })
+      .catch((cause: unknown) => {
+        if (active) setError(cause instanceof Error ? cause.message : "Unable to load institution trends.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [accessToken, reload]);
+
+  if (loading) {
+    return <p className="student-state" role="status">Loading institution trends...</p>;
+  }
+  if (error) {
+    return (
+      <div className="student-state student-error" role="alert">
+        <p>{error}</p>
+        <button className="button button-small button-outline" onClick={() => setReload((n) => n + 1)} type="button">
+          Try again
+        </button>
+      </div>
+    );
+  }
+  if (!data) return null;
+
+  // Flatten the department lines into one row per month so Recharts can plot them.
+  const monthLabels = data.academic_trend.institution.map((point) => point.label);
+  const institutionRows = monthLabels.map((month, index) => {
+    const row: Record<string, number | string> = {
+      month,
+      Institution: data.academic_trend.institution[index]?.value ?? 0,
+    };
+    data.academic_trend.by_department.forEach((line) => {
+      row[line.name] = line.points[index]?.value ?? 0;
+    });
+    return row;
+  });
+
+  return (
+    <>
+      {data.ai_summary && (
+        <section className="analytics-panel analytics-insights" aria-labelledby="ai-summary-heading">
+          <div className="analytics-panel-heading">
+            <div>
+              <h2 id="ai-summary-heading">Institution briefing</h2>
+              <p>Generated from the current numbers. No student identifiers are used.</p>
+            </div>
+          </div>
+          <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.55 }}>{data.ai_summary}</p>
+        </section>
+      )}
+
+      <section className="analytics-kpis" aria-label="Institution headline numbers">
+        <article><span>Total students</span><strong>{data.total_students}</strong></article>
+        <article><span>Average attendance</span><strong>{data.average_attendance.toFixed(1)}<small> %</small></strong></article>
+        <article><span>Average marks</span><strong>{data.average_marks.toFixed(1)}<small> %</small></strong></article>
+        <article><span>Placement readiness</span><strong>{data.placement_readiness.overall_average.toFixed(1)}</strong></article>
+      </section>
+
+      <ChartPanel
+        title="Academic improvement over time"
+        description="Average marks per month across the institution and each department."
+      >
+        <div className="analytics-chart">
+          <ResponsiveContainer width="100%" height={340}>
+            <LineChart data={institutionRows} margin={{ bottom: 22, left: 0, right: 12 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="month" label={{ value: "Month", position: "insideBottom", offset: -12 }} />
+              <YAxis
+                domain={[0, 100]}
+                label={{ value: "Average marks (%)", angle: -90, position: "insideLeft" }}
+              />
+              <Tooltip />
+              <Legend />
+              <Line
+                dataKey="Institution"
+                type="monotone"
+                stroke="#1a1a1a"
+                strokeWidth={3}
+                dot={{ r: 3 }}
+              />
+              {data.academic_trend.by_department.map((line, index) => (
+                <Line
+                  key={line.name}
+                  dataKey={line.name}
+                  type="monotone"
+                  stroke={DEPARTMENT_COLORS[index % DEPARTMENT_COLORS.length]}
+                  strokeWidth={2}
+                  dot={{ r: 2 }}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </ChartPanel>
+
+      <ChartPanel
+        title="Placement readiness"
+        description={data.placement_readiness.note}
+      >
+        <div className="analytics-chart">
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart
+              data={data.placement_readiness.points}
+              margin={{ bottom: 22, left: 0, right: 12 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="label" label={{ value: "Month", position: "insideBottom", offset: -12 }} />
+              <YAxis label={{ value: "Readiness", angle: -90, position: "insideLeft" }} />
+              <Tooltip />
+              <Line
+                dataKey="value"
+                name="Readiness"
+                type="monotone"
+                stroke="#3d83a3"
+                strokeWidth={3}
+                dot={{ r: 3 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </ChartPanel>
+    </>
+  );
+}
+
 export function AnalyticsDashboard({ role }: { role: "dean" | "principal" }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -446,7 +628,7 @@ export function AnalyticsDashboard({ role }: { role: "dean" | "principal" }) {
           <span className="analytics-scope">{role === "dean" ? "Your department" : "All departments"}</span>
         </header>
         <nav className="analytics-nav" aria-label="Analytics sections">
-          {SECTIONS.map((item) => (
+          {sectionsFor(role).map((item) => (
             <button
               aria-current={section === item.id ? "page" : undefined}
               className={section === item.id ? "analytics-nav-active" : ""}
@@ -600,6 +782,8 @@ export function AnalyticsDashboard({ role }: { role: "dean" | "principal" }) {
                 </div>
               </section>
             )}
+
+            {section === "trends" && role === "principal" && <PrincipalTrendsPanel />}
 
             {section === "quality" && (
               <>
