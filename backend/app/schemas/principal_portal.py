@@ -35,4 +35,15 @@ class PrincipalDashboard(BaseModel):
     average_marks: float
     academic_trend: AcademicTrend
     placement_readiness: PlacementReadinessTrend
+    placement_trend: "PlacementTrendView"
     ai_summary: str | None
+
+
+class PlacementTrendView(BaseModel):
+    points: list[TrendPoint]
+    total_placed: int
+    placement_rate: float
+    note: str
+
+
+PrincipalDashboard.model_rebuild()

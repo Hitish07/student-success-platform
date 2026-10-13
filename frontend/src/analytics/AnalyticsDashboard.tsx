@@ -376,6 +376,12 @@ interface PrincipalDashboardData {
     overall_average: number;
     note: string;
   };
+  placement_trend: {
+    points: TrendPoint[];
+    total_placed: number;
+    placement_rate: number;
+    note: string;
+  };
   ai_summary: string | null;
 }
 
@@ -456,6 +462,7 @@ function PrincipalTrendsPanel() {
         <article><span>Average attendance</span><strong>{data.average_attendance.toFixed(1)}<small> %</small></strong></article>
         <article><span>Average marks</span><strong>{data.average_marks.toFixed(1)}<small> %</small></strong></article>
         <article><span>Placement readiness</span><strong>{data.placement_readiness.overall_average.toFixed(1)}</strong></article>
+        <article><span>Students placed</span><strong>{data.placement_trend.total_placed}</strong></article>
       </section>
 
       <ChartPanel
@@ -496,24 +503,24 @@ function PrincipalTrendsPanel() {
       </ChartPanel>
 
       <ChartPanel
-        title="Placement readiness"
-        description={data.placement_readiness.note}
+        title="Placements over time"
+        description={data.placement_trend.note}
       >
         <div className="analytics-chart">
           <ResponsiveContainer width="100%" height={300}>
             <LineChart
-              data={data.placement_readiness.points}
+              data={data.placement_trend.points}
               margin={{ bottom: 22, left: 0, right: 12 }}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="label" label={{ value: "Month", position: "insideBottom", offset: -12 }} />
-              <YAxis label={{ value: "Readiness", angle: -90, position: "insideLeft" }} />
+              <YAxis allowDecimals={false} label={{ value: "Students placed", angle: -90, position: "insideLeft" }} />
               <Tooltip />
               <Line
                 dataKey="value"
-                name="Readiness"
+                name="Placed"
                 type="monotone"
-                stroke="#3d83a3"
+                stroke="#277c6c"
                 strokeWidth={3}
                 dot={{ r: 3 }}
               />

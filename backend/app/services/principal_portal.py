@@ -22,11 +22,13 @@ from app.models import (
 from app.schemas.principal_portal import (
     AcademicTrend,
     PlacementReadinessTrend,
+    PlacementTrendView,
     PrincipalDashboard,
     SeriesLine,
     TrendPoint,
 )
 from app.services.gemini import GeminiError, summarize_dashboard
+from app.services.placements import get_placement_trend
 
 
 MONTHS = 6
@@ -191,6 +193,12 @@ def _build_summary_payload(dashboard: PrincipalDashboard) -> dict:
             for line in dashboard.academic_trend.by_department
         ],
         "placement_readiness_average": dashboard.placement_readiness.overall_average,
+        "placement_rate": dashboard.placement_trend.placement_rate,
+        "placement_total": dashboard.placement_trend.total_placed,
+        "placement_trend": [
+            {"month": point.label, "placed": point.value}
+            for point in dashboard.placement_trend.points
+        ],
     }
 
 
@@ -205,6 +213,13 @@ def get_principal_dashboard(db: Session, principal: User) -> PrincipalDashboard:
     total_students, average_attendance, average_marks = _headline_numbers(db)
     academic_trend = _academic_trend(db, MONTHS)
     placement_readiness = _placement_readiness_trend(db, MONTHS)
+    placement_trend_raw = get_placement_trend(db)
+    placement_trend = PlacementTrendView(
+        points=[TrendPoint(label=p.label, value=p.value) for p in placement_trend_raw.points],
+        total_placed=placement_trend_raw.total_placed,
+        placement_rate=placement_trend_raw.placement_rate,
+        note=placement_trend_raw.note,
+    )
 
     dashboard = PrincipalDashboard(
         total_students=total_students,
@@ -212,6 +227,7 @@ def get_principal_dashboard(db: Session, principal: User) -> PrincipalDashboard:
         average_marks=average_marks,
         academic_trend=academic_trend,
         placement_readiness=placement_readiness,
+        placement_trend=placement_trend,
         ai_summary=None,
     )
     dashboard.ai_summary = _safe_ai_summary(dashboard)

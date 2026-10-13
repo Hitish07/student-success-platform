@@ -172,7 +172,7 @@ DASHBOARD_SYSTEM_INSTRUCTION = (
     "Write ONE paragraph in plain English, under 120 words. Cover:\n"
     "1. The overall academic trajectory (improving, flat, or declining).\n"
     "2. The strongest and weakest departments by average marks.\n"
-    "3. The placement readiness picture.\n"
+    "3. The placement picture: total placed and the monthly trend.\n"
     "4. One thing worth the principal's attention.\n"
     "Rules: no bullet points, no headings, no numbers you were not given, "
     "no opinions about individual students. Speak about departments and the "
@@ -188,6 +188,13 @@ def _format_dashboard_stats(stats: dict) -> str:
     lines.append(
         f"Placement readiness average: {stats.get('placement_readiness_average', 0)}"
     )
+    lines.append(f"Placement rate: {stats.get('placement_rate', 0)}")
+    lines.append(f"Total students placed: {stats.get('placement_total', 0)}")
+    placement_points = stats.get('placement_trend') or []
+    if placement_points:
+        lines.append("Placements per month:")
+        for point in placement_points:
+            lines.append(f"  {point.get('month')}: {point.get('placed')}")
 
     institution = stats.get("academic_institution") or []
     if institution:
