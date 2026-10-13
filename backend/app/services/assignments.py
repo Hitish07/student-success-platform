@@ -15,6 +15,7 @@ from app.models import (
 )
 from app.schemas.assignments import (
     AssignmentCreate,
+    AssignmentSubmit,
     AssignmentSubmissionView,
     FacultyAssignmentView,
     FacultySubjectView,
@@ -181,12 +182,18 @@ def get_student_assignments(db: Session, student: User) -> list[StudentAssignmen
                 max_marks=assignment.max_marks,
                 status=submission_status,
                 submitted_at=submission.submitted_at if submission is not None else None,
+                answer_text=submission.answer_text if submission is not None else None,
             )
         )
     return results
 
 
-def submit_assignment(db: Session, student: User, assignment_id: int) -> AssignmentSubmissionView:
+def submit_assignment(
+    db: Session,
+    student: User,
+    assignment_id: int,
+    payload: AssignmentSubmit,
+) -> AssignmentSubmissionView:
     profile = _student_profile(db, student)
     assignment = db.get(Assignment, assignment_id)
     subject = db.get(Subject, assignment.subject_id) if assignment is not None else None
@@ -208,7 +215,11 @@ def submit_assignment(db: Session, student: User, assignment_id: int) -> Assignm
     if existing is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Assignment already submitted.")
 
-    submission = AssignmentSubmission(assignment_id=assignment.id, student_id=student.id)
+    submission = AssignmentSubmission(
+        assignment_id=assignment.id,
+        student_id=student.id,
+        answer_text=payload.answer_text,
+    )
     db.add(submission)
     db.commit()
     db.refresh(submission)

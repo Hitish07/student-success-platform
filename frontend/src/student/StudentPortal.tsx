@@ -70,6 +70,7 @@ interface StudentAssignment {
   max_marks: number;
   status: "open" | "overdue" | "submitted";
   submitted_at: string | null;
+  answer_text: string | null;
 }
 
 interface JourneyEvent {
@@ -273,15 +274,15 @@ function MyAcademics() {
         {profile.data && year !== undefined && semester !== undefined && (
           <>
             <form className="academic-controls" onSubmit={saveAcademicYear}>
-              <label htmlFor="academic-department">Department</label>
+              <div className="academic-field" style={{ display: "grid", gap: "0.35rem" }}><label htmlFor="academic-department">Department</label>
               <select
                 disabled
                 id="academic-department"
                 value={profile.data.department_id}
               >
                 <option value={profile.data.department_id}>{profile.data.department}</option>
-              </select>
-              <label htmlFor="academic-year">Year</label>
+              </select></div>
+              <div className="academic-field" style={{ display: "grid", gap: "0.35rem" }}><label htmlFor="academic-year">Year</label>
               <select
                 id="academic-year"
                 onChange={(event) => {
@@ -293,8 +294,8 @@ function MyAcademics() {
                 {[1, 2, 3, 4].map((value) => (
                   <option key={value} value={value}>Year {value}</option>
                 ))}
-              </select>
-              <label htmlFor="academic-semester">Semester</label>
+              </select></div>
+              <div className="academic-field" style={{ display: "grid", gap: "0.35rem" }}><label htmlFor="academic-semester">Semester</label>
               <select
                 id="academic-semester"
                 onChange={(event) => {
@@ -306,7 +307,7 @@ function MyAcademics() {
                 {[1, 2].map((value) => (
                   <option key={value} value={value}>Semester {value}</option>
                 ))}
-              </select>
+              </select></div>
               <button className="button button-small" disabled={!hasChanges || isSaving} type="submit">
                 {isSaving ? "Saving…" : "Save current year"}
               </button>
@@ -357,17 +358,25 @@ function MyAcademics() {
 function StudentAssignmentList() {
   const { accessToken } = useAuth();
   const assignments = useStudentResource<StudentAssignment[]>("/student/assignments");
+  const [openId, setOpenId] = useState<number | null>(null);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
   const [submittingId, setSubmittingId] = useState<number | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
 
   async function submit(assignmentId: number) {
+    const answer = (answers[assignmentId] ?? "").trim();
+    if (!answer) {
+      setSubmitError("Write your answer before submitting.");
+      return;
+    }
     setSubmittingId(assignmentId);
     setSubmitError(null);
     setSubmitMessage(null);
     try {
       await apiRequest(`/student/assignments/${assignmentId}/submit`, {
         method: "POST",
+        body: JSON.stringify({ answer_text: answer }),
       }, accessToken ?? undefined);
       setSubmitMessage("Assignment submitted.");
       assignments.reload();
@@ -402,33 +411,75 @@ function StudentAssignmentList() {
                   <th scope="col">Action</th>
                 </tr>
               </thead>
-              <tbody>
-                {assignments.data.map((assignment) => (
-                  <tr key={assignment.id}>
-                    <td>{assignment.subject_code} · {assignment.subject_name}</td>
-                    <td>
-                      <strong>{assignment.title}</strong>
-                      {assignment.description && <span className="assignment-description">{assignment.description}</span>}
-                    </td>
-                    <td>{assignment.due_date}</td>
-                    <td>{assignment.status}</td>
-                    <td>
-                      <button
-                        className="button button-small button-outline"
-                        disabled={assignment.status === "submitted" || submittingId === assignment.id}
-                        onClick={() => void submit(assignment.id)}
-                        type="button"
-                      >
-                        {assignment.status === "submitted"
-                          ? "Submitted"
-                          : submittingId === assignment.id
-                            ? "Submitting…"
-                            : "Submit"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+              {assignments.data.map((assignment) => {
+                const isOpen = openId === assignment.id;
+                const isSubmitted = assignment.status === "submitted";
+                return (
+                  <tbody key={assignment.id}>
+                    <tr>
+                      <td>{assignment.subject_code} - {assignment.subject_name}</td>
+                      <td><strong>{assignment.title}</strong></td>
+                      <td>{assignment.due_date}</td>
+                      <td>{assignment.status}</td>
+                      <td>
+                        <button
+                          aria-expanded={isOpen}
+                          className="button button-small button-outline"
+                          onClick={() => setOpenId(isOpen ? null : assignment.id)}
+                          type="button"
+                        >
+                          {isOpen ? "Close" : isSubmitted ? "View" : "Open"}
+                        </button>
+                      </td>
+                    </tr>
+                    {isOpen && (
+                      <tr>
+                        <td colSpan={5}>
+                          <div style={{ display: "grid", gap: "0.75rem", padding: "0.75rem 0" }}>
+                            <p>
+                              <strong>{assignment.title}</strong> (due {assignment.due_date}, max marks {assignment.max_marks})
+                            </p>
+                            <p style={{ whiteSpace: "pre-wrap" }}>
+                              {assignment.description ?? "No instructions were added for this assignment."}
+                            </p>
+                            {isSubmitted ? (
+                              <>
+                                <p><strong>Your submitted answer</strong></p>
+                                <p style={{ whiteSpace: "pre-wrap" }}>
+                                  {assignment.answer_text ?? "No answer text was saved for this submission."}
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <label htmlFor={`assignment-answer-${assignment.id}`}>Your answer</label>
+                                <textarea
+                                  id={`assignment-answer-${assignment.id}`}
+                                  maxLength={10000}
+                                  onChange={(event) =>
+                                    setAnswers((current) => ({ ...current, [assignment.id]: event.target.value }))
+                                  }
+                                  rows={8}
+                                  value={answers[assignment.id] ?? ""}
+                                />
+                                <div>
+                                  <button
+                                    className="button button-small"
+                                    disabled={submittingId === assignment.id}
+                                    onClick={() => void submit(assignment.id)}
+                                    type="button"
+                                  >
+                                    {submittingId === assignment.id ? "Submitting..." : "Submit assignment"}
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                );
+              })}
             </table>
           </div>
         )}

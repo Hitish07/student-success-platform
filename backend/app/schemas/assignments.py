@@ -55,6 +55,16 @@ class StudentAssignmentView(BaseModel):
     max_marks: Decimal
     status: Literal["open", "overdue", "submitted"]
     submitted_at: datetime | None
+    answer_text: str | None = None
+
+
+AnswerText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=10000)]
+
+
+class AssignmentSubmit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    answer_text: AnswerText
 
 
 class AssignmentSubmissionView(BaseModel):

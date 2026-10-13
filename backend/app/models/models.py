@@ -169,6 +169,7 @@ class AssignmentSubmission(Base):
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     marks: Mapped[Decimal | None] = mapped_column(Numeric(8, 2))
     feedback: Mapped[str | None] = mapped_column(Text)
+    answer_text: Mapped[str | None] = mapped_column(Text)
 
 
 class Course(Base):

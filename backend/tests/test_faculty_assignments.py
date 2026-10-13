@@ -291,16 +291,19 @@ def test_student_sees_and_submits_only_current_academic_assignments(client, data
     forbidden = client.post(
         f"/student/assignments/{records['other_assignment_id']}/submit",
         headers=student_headers,
+        json={"answer_text": "My answer"},
     )
     assert forbidden.status_code == 404
     submitted = client.post(
         f"/student/assignments/{records['assignment_id']}/submit",
         headers=student_headers,
+        json={"answer_text": "My answer"},
     )
     assert submitted.status_code == 201
     assert client.post(
         f"/student/assignments/{records['assignment_id']}/submit",
         headers=student_headers,
+        json={"answer_text": "Second attempt"},
     ).status_code == 409
     refreshed = client.get("/student/assignments", headers=student_headers)
     assert refreshed.status_code == 200
@@ -329,3 +332,44 @@ def test_assignment_submission_unique_constraint(database):
         with pytest.raises(IntegrityError):
             session.commit()
         session.rollback()
+
+
+def test_submission_saves_and_returns_answer_text(client, database):
+    records = assignment_records(database)
+    headers = bearer(client, "assignment.student@example.invalid")
+    url = f"/student/assignments/{records['assignment_id']}/submit"
+
+    response = client.post(url, headers=headers, json={"answer_text": "  My written answer  "})
+    assert response.status_code == 201
+
+    listed = client.get("/student/assignments", headers=headers).json()
+    row = next(item for item in listed if item["id"] == records["assignment_id"])
+    assert row["status"] == "submitted"
+    assert row["answer_text"] == "My written answer"
+
+
+def test_submission_rejects_empty_or_whitespace_answer(client, database):
+    records = assignment_records(database)
+    headers = bearer(client, "assignment.student@example.invalid")
+    url = f"/student/assignments/{records['assignment_id']}/submit"
+
+    assert client.post(url, headers=headers, json={"answer_text": ""}).status_code == 422
+    assert client.post(url, headers=headers, json={"answer_text": "   \n  "}).status_code == 422
+    assert client.post(url, headers=headers, json={}).status_code == 422
+
+    listed = client.get("/student/assignments", headers=headers).json()
+    row = next(item for item in listed if item["id"] == records["assignment_id"])
+    assert row["status"] != "submitted"
+    assert row["answer_text"] is None
+
+
+def test_submission_rejects_extra_fields_and_oversized_answer(client, database):
+    records = assignment_records(database)
+    headers = bearer(client, "assignment.student@example.invalid")
+    url = f"/student/assignments/{records['assignment_id']}/submit"
+
+    extra = client.post(url, headers=headers, json={"answer_text": "ok", "marks": 100})
+    assert extra.status_code == 422
+
+    too_long = client.post(url, headers=headers, json={"answer_text": "x" * 10001})
+    assert too_long.status_code == 422

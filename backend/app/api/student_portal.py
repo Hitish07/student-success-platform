@@ -12,7 +12,7 @@ from app.schemas.student_portal import (
     StudentJourney,
     StudentSubjects,
 )
-from app.schemas.assignments import AssignmentSubmissionView, StudentAssignmentView
+from app.schemas.assignments import AssignmentSubmissionView, AssignmentSubmit, StudentAssignmentView
 from app.services.assignments import get_student_assignments, submit_assignment
 from app.services.student_portal import (
     get_academic_profile,
@@ -46,10 +46,11 @@ def student_assignments(
 )
 def submit_student_assignment(
     assignment_id: int,
+    payload: AssignmentSubmit,
     user: AuthenticatedUser,
     db: DatabaseSession,
 ) -> AssignmentSubmissionView:
-    return submit_assignment(db, user, assignment_id)
+    return submit_assignment(db, user, assignment_id, payload)
 
 
 @router.get("/profile", response_model=StudentAcademicProfile)
