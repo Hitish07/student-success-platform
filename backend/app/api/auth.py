@@ -23,6 +23,9 @@ from app.services.auth_service import (
     rotate_refresh_token,
 )
 
+from app.schemas.auth import ForgotPasswordRequest, MessageResponse, ResetPasswordRequest
+from app.services.password_reset import request_password_reset, reset_password
+
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
 
@@ -85,3 +88,19 @@ def logout(
 @router.get("/me", response_model=UserResponse)
 def me(user: AuthenticatedUser) -> UserResponse:
     return user
+
+
+@router.post("/forgot-password", response_model=MessageResponse, status_code=status.HTTP_202_ACCEPTED)
+def forgot_password(payload: ForgotPasswordRequest, db: DatabaseSession) -> dict:
+    request_password_reset(db, payload.email)
+    return {"message": "If an account with that email exists, a reset link has been sent."}
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+def reset_password_endpoint(payload: ResetPasswordRequest, db: DatabaseSession) -> dict:
+    if not reset_password(db, payload.token, payload.new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This reset link is invalid or has expired.",
+        )
+    return {"message": "Your password was updated. You can sign in now."}
