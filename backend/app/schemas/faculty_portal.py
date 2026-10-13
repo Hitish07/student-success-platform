@@ -179,3 +179,22 @@ class SuccessResponse(FacultySchema):
 
 class CreatedResponse(FacultySchema):
     id: int
+
+
+class DoubtQuestionView(BaseModel):
+    question: str
+    answer_preview: str
+    created_at: datetime
+
+
+class DoubtTopicSummary(BaseModel):
+    subject_id: int
+    subject_code: str
+    subject_name: str
+    total: int
+    recent: list[DoubtQuestionView]
+
+
+class FacultyDoubtsView(BaseModel):
+    topics: list[DoubtTopicSummary]
+    total_doubts: int
