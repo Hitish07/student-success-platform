@@ -19,8 +19,10 @@ from app.schemas.assignments import (
     AssignmentSubmissionView,
     FacultyAssignmentView,
     FacultySubjectView,
+    GradeSubmission,
     StudentAssignmentView,
     SubjectStudentView,
+    SubmissionGradingView,
 )
 
 
@@ -183,6 +185,8 @@ def get_student_assignments(db: Session, student: User) -> list[StudentAssignmen
                 status=submission_status,
                 submitted_at=submission.submitted_at if submission is not None else None,
                 answer_text=submission.answer_text if submission is not None else None,
+                marks=submission.marks if submission is not None else None,
+                feedback=submission.feedback if submission is not None else None,
             )
         )
     return results
@@ -228,3 +232,70 @@ def submit_assignment(
         assignment_id=submission.assignment_id,
         submitted_at=submission.submitted_at,
     )
+
+
+def _grading_view(
+    submission: AssignmentSubmission,
+    assignment: Assignment,
+    student: User,
+) -> SubmissionGradingView:
+    return SubmissionGradingView(
+        id=submission.id,
+        assignment_id=assignment.id,
+        student_id=student.id,
+        student_name=student.full_name,
+        student_email=student.email,
+        submitted_at=submission.submitted_at,
+        answer_text=submission.answer_text,
+        marks=submission.marks,
+        feedback=submission.feedback,
+        max_marks=assignment.max_marks,
+    )
+
+
+def get_assignment_submissions(
+    db: Session,
+    faculty: User,
+    assignment_id: int,
+) -> list[SubmissionGradingView]:
+    assignment = db.get(Assignment, assignment_id)
+    if assignment is None or assignment.faculty_id != faculty.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found.")
+    rows = db.execute(
+        select(AssignmentSubmission, User)
+        .join(User, User.id == AssignmentSubmission.student_id)
+        .where(AssignmentSubmission.assignment_id == assignment.id)
+        .order_by(AssignmentSubmission.submitted_at, AssignmentSubmission.id)
+    ).all()
+    return [_grading_view(submission, assignment, student) for submission, student in rows]
+
+
+def grade_submission(
+    db: Session,
+    faculty: User,
+    submission_id: int,
+    payload: GradeSubmission,
+) -> SubmissionGradingView:
+    submission = db.get(AssignmentSubmission, submission_id)
+    assignment = db.get(Assignment, submission.assignment_id) if submission is not None else None
+    if submission is None or assignment is None or assignment.faculty_id != faculty.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found.")
+    if payload.marks > assignment.max_marks:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Marks cannot exceed the maximum of {assignment.max_marks}.",
+        )
+    submission.marks = payload.marks
+    submission.feedback = (payload.feedback or "").strip() or None
+    db.add(
+        AuditLog(
+            actor_id=faculty.id,
+            action="submission.graded",
+            entity_type="assignment_submission",
+            entity_id=str(submission.id),
+        )
+    )
+    db.commit()
+    db.refresh(submission)
+    student = db.get(User, submission.student_id)
+    return _grading_view(submission, assignment, student)

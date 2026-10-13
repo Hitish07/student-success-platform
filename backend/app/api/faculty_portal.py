@@ -23,7 +23,14 @@ from app.schemas.faculty_portal import (
     StudentNoteView,
     SuccessResponse,
 )
-from app.schemas.assignments import AssignmentCreate, FacultyAssignmentView, FacultySubjectView, SubjectStudentView
+from app.schemas.assignments import (
+    AssignmentCreate,
+    FacultyAssignmentView,
+    FacultySubjectView,
+    GradeSubmission,
+    SubjectStudentView,
+    SubmissionGradingView,
+)
 from app.services import assignments as assignments_service
 from app.services import faculty_portal as service
 
@@ -70,6 +77,28 @@ def faculty_assignments(
     db: DatabaseSession,
 ) -> list[FacultyAssignmentView]:
     return assignments_service.get_faculty_assignments(db, user)
+
+
+@router.get(
+    "/assignments/{assignment_id}/submissions",
+    response_model=list[SubmissionGradingView],
+)
+def assignment_submissions(
+    assignment_id: int,
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> list[SubmissionGradingView]:
+    return assignments_service.get_assignment_submissions(db, user, assignment_id)
+
+
+@router.put("/submissions/{submission_id}/grade", response_model=SubmissionGradingView)
+def grade_assignment_submission(
+    submission_id: int,
+    payload: GradeSubmission,
+    user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> SubmissionGradingView:
+    return assignments_service.grade_submission(db, user, submission_id, payload)
 
 
 @router.get("/dashboard", response_model=FacultyDashboard)

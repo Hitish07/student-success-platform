@@ -1,3 +1,4 @@
+import { SubmissionsPanel } from "./SubmissionsPanel";
 import { ChangePassword } from "../auth/ChangePassword";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
@@ -367,6 +368,7 @@ function FacultyAssignmentsSection() {
                 <li key={item.id}>
                   <strong>{item.title} · {item.subject_code}</strong>
                   <span>Due {item.due_date} · {item.max_marks} marks</span>
+                  <SubmissionsPanel assignmentId={item.id} />
                 </li>
               ))}
             </ul>

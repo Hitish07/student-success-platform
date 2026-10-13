@@ -56,6 +56,8 @@ class StudentAssignmentView(BaseModel):
     status: Literal["open", "overdue", "submitted"]
     submitted_at: datetime | None
     answer_text: str | None = None
+    marks: Decimal | None = None
+    feedback: str | None = None
 
 
 AnswerText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=10000)]
@@ -71,3 +73,23 @@ class AssignmentSubmissionView(BaseModel):
     id: int
     assignment_id: int
     submitted_at: datetime
+
+
+class GradeSubmission(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    marks: Decimal = Field(ge=0, max_digits=8, decimal_places=2)
+    feedback: str | None = Field(default=None, max_length=5000)
+
+
+class SubmissionGradingView(BaseModel):
+    id: int
+    assignment_id: int
+    student_id: int
+    student_name: str
+    student_email: str
+    submitted_at: datetime
+    answer_text: str | None
+    marks: Decimal | None
+    feedback: str | None
+    max_marks: Decimal

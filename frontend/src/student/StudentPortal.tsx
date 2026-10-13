@@ -72,6 +72,8 @@ interface StudentAssignment {
   status: "open" | "overdue" | "submitted";
   submitted_at: string | null;
   answer_text: string | null;
+  marks?: number | string | null;
+  feedback?: string | null;
 }
 
 interface JourneyEvent {
@@ -445,7 +447,13 @@ function StudentAssignmentList() {
                             </p>
                             {isSubmitted ? (
                               <>
-                                <p><strong>Your submitted answer</strong></p>
+                                {assignment.marks != null && (
+                              <p><strong>Marks: {assignment.marks} / {assignment.max_marks}</strong></p>
+                            )}
+                            {assignment.feedback && (
+                              <p style={{ whiteSpace: "pre-wrap" }}>Faculty feedback: {assignment.feedback}</p>
+                            )}
+                            <p><strong>Your submitted answer</strong></p>
                                 <p style={{ whiteSpace: "pre-wrap" }}>
                                   {assignment.answer_text ?? "No answer text was saved for this submission."}
                                 </p>

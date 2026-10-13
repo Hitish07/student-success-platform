@@ -373,3 +373,87 @@ def test_submission_rejects_extra_fields_and_oversized_answer(client, database):
 
     too_long = client.post(url, headers=headers, json={"answer_text": "x" * 10001})
     assert too_long.status_code == 422
+
+
+def _grading_setup(client, database):
+    from app.models.models import Assignment, User
+
+    records = assignment_records(database)
+    student_headers = bearer(client, "assignment.student@example.invalid")
+    submitted = client.post(
+        f"/student/assignments/{records['assignment_id']}/submit",
+        headers=student_headers,
+        json={"answer_text": "Student answer"},
+    )
+    assert submitted.status_code == 201
+    with database() as db:
+        assignment = db.get(Assignment, records["assignment_id"])
+        owner = db.get(User, assignment.faculty_id)
+        owner_email = owner.email
+        db.add(
+            User(
+                email="other.faculty@example.invalid",
+                full_name="Other Faculty",
+                role="faculty",
+                password_hash=owner.password_hash,
+            )
+        )
+        db.commit()
+    faculty_headers = bearer(client, owner_email)
+    other_headers = bearer(client, "other.faculty@example.invalid")
+    listing = client.get(
+        f"/faculty/assignments/{records['assignment_id']}/submissions", headers=faculty_headers
+    )
+    assert listing.status_code == 200
+    return records, student_headers, faculty_headers, other_headers, listing.json()
+
+
+def test_faculty_lists_submissions_only_for_own_assignment(client, database):
+    records, student_headers, faculty_headers, other_headers, rows = _grading_setup(client, database)
+    assert len(rows) == 1
+    assert rows[0]["answer_text"] == "Student answer"
+    assert rows[0]["student_email"] == "assignment.student@example.invalid"
+    assert rows[0]["marks"] is None
+    url = f"/faculty/assignments/{records['assignment_id']}/submissions"
+    assert client.get(url, headers=other_headers).status_code == 404
+    assert client.get(url, headers=student_headers).status_code in {401, 403}
+    assert client.get("/faculty/assignments/999999/submissions", headers=faculty_headers).status_code == 404
+
+
+def test_faculty_grades_submission_and_student_sees_result(client, database):
+    records, student_headers, faculty_headers, other_headers, rows = _grading_setup(client, database)
+    sid = rows[0]["id"]
+    grade_url = f"/faculty/submissions/{sid}/grade"
+
+    graded = client.put(grade_url, headers=faculty_headers, json={"marks": 7.5, "feedback": "  Good work  "})
+    assert graded.status_code == 200
+    assert float(graded.json()["marks"]) == 7.5
+    assert graded.json()["feedback"] == "Good work"
+
+    mine = client.get("/student/assignments", headers=student_headers).json()
+    row = next(item for item in mine if item["id"] == records["assignment_id"])
+    assert float(row["marks"]) == 7.5
+    assert row["feedback"] == "Good work"
+
+    regraded = client.put(grade_url, headers=faculty_headers, json={"marks": 8, "feedback": None})
+    assert regraded.status_code == 200
+    assert float(regraded.json()["marks"]) == 8
+    assert regraded.json()["feedback"] is None
+
+
+def test_grading_rejects_invalid_marks_and_other_faculty(client, database):
+    records, student_headers, faculty_headers, other_headers, rows = _grading_setup(client, database)
+    sid = rows[0]["id"]
+    grade_url = f"/faculty/submissions/{sid}/grade"
+    over = float(rows[0]["max_marks"]) + 1
+
+    assert client.put(grade_url, headers=faculty_headers, json={"marks": over}).status_code == 422
+    assert client.put(grade_url, headers=faculty_headers, json={"marks": -1}).status_code == 422
+    assert client.put(grade_url, headers=faculty_headers, json={"marks": 1, "extra": 1}).status_code == 422
+    assert client.put(grade_url, headers=faculty_headers, json={}).status_code == 422
+    assert client.put(grade_url, headers=other_headers, json={"marks": 1}).status_code == 404
+    assert client.put(grade_url, headers=student_headers, json={"marks": 1}).status_code in {401, 403}
+    assert client.put("/faculty/submissions/999999/grade", headers=faculty_headers, json={"marks": 1}).status_code == 404
+
+    row = client.get(f"/faculty/assignments/{records['assignment_id']}/submissions", headers=faculty_headers).json()[0]
+    assert row["marks"] is None
