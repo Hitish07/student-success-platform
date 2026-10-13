@@ -165,3 +165,85 @@ def test_doubt_daily_limit(client, database, fake_gemini):
     )
     assert blocked.status_code == 429
     assert "daily limit" in blocked.json()["detail"].lower()
+
+
+def test_faculty_doubts_summary_groups_by_subject(client, database, fake_gemini):
+    records = doubt_records(database)
+    student_headers = bearer(client, "doubts.student@example.invalid")
+
+    for index in range(3):
+        ok = client.post(
+            "/student/doubts",
+            headers=student_headers,
+            json={
+                "subject_code": records["subject_code"],
+                "question": f"Question {index} about primary subject.",
+            },
+        )
+        assert ok.status_code == 201
+
+    from app.models import FacultyProfile, FacultySubject, User
+    with database() as session:
+        faculty = User(
+            email="doubts.faculty@example.invalid",
+            full_name="Doubts Faculty",
+            role="faculty",
+            department_id=1,
+            password_hash=hash_password(PASSWORD),
+        )
+        session.add(faculty)
+        session.flush()
+        session.add(FacultyProfile(user_id=faculty.id, department_id=1))
+        subject = session.query(Subject).filter(Subject.code == records["subject_code"]).one()
+        session.add(FacultySubject(faculty_id=faculty.id, subject_id=subject.id))
+        session.commit()
+
+    faculty_headers = bearer(client, "doubts.faculty@example.invalid")
+    response = client.get("/faculty/doubts", headers=faculty_headers)
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total_doubts"] == 3
+    assert len(payload["topics"]) == 1
+    topic = payload["topics"][0]
+    assert topic["subject_code"] == records["subject_code"]
+    assert topic["total"] == 3
+    assert len(topic["recent"]) == 3
+    body_text = response.text
+    assert "doubts.student@example.invalid" not in body_text
+    assert "Doubts Student" not in body_text
+
+
+def test_faculty_doubts_summary_empty_for_unrelated_faculty(client, database, fake_gemini):
+    records = doubt_records(database)
+    student_headers = bearer(client, "doubts.student@example.invalid")
+
+    ok = client.post(
+        "/student/doubts",
+        headers=student_headers,
+        json={
+            "subject_code": records["subject_code"],
+            "question": "A single question about the subject.",
+        },
+    )
+    assert ok.status_code == 201
+
+    from app.models import FacultyProfile, User
+    with database() as session:
+        faculty = User(
+            email="unrelated.faculty@example.invalid",
+            full_name="Unrelated Faculty",
+            role="faculty",
+            department_id=1,
+            password_hash=hash_password(PASSWORD),
+        )
+        session.add(faculty)
+        session.flush()
+        session.add(FacultyProfile(user_id=faculty.id, department_id=1))
+        session.commit()
+
+    faculty_headers = bearer(client, "unrelated.faculty@example.invalid")
+    response = client.get("/faculty/doubts", headers=faculty_headers)
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total_doubts"] == 0
+    assert payload["topics"] == []
