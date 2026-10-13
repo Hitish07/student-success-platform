@@ -952,7 +952,7 @@ interface DoubtList {
   remaining_today: number;
 }
 
-function StudentDoubts() {
+function DoubtsScreen() {
   const { accessToken } = useAuth();
   const subjects = useStudentResource<DoubtSubjectsPayload>("/student/subjects");
   const doubts = useStudentResource<DoubtList>("/student/doubts");
@@ -1143,4 +1143,4 @@ export function StudentPortalLayout() {
 export const StudentDashboard = DashboardScreen;
 export const StudentJourney = JourneyScreen;
 export const StudentFeedback = FeedbackScreen;
-export const StudentDoubts = StudentDoubts;
+export const StudentDoubts = DoubtsScreen;
