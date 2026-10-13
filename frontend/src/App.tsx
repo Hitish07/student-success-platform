@@ -31,6 +31,7 @@ import {
 } from "./auth/AuthContext";
 import {
   StudentDashboard,
+  StudentDoubts,
   StudentFeedback,
   StudentJourney,
   StudentPortalLayout,
@@ -661,6 +662,7 @@ function AppRoutes() {
           <Route element={<StudentDashboard />} index />
           <Route element={<StudentJourney />} path="journey" />
           <Route element={<StudentFeedback />} path="feedback" />
+          <Route element={<StudentDoubts />} path="doubts" />
         </Route>
       </Route>
       <Route element={<RequirePortalRole role="faculty" />}>

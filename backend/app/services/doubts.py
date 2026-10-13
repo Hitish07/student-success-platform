@@ -55,15 +55,17 @@ def _student_profile(db: Session, student: User) -> StudentProfile:
     return profile
 
 
-def _subject_for_student(db: Session, student: User, subject_id: int) -> Subject:
+def _subject_for_student(db: Session, student: User, subject_code: str) -> Subject:
     profile = _student_profile(db, student)
-    subject = db.get(Subject, subject_id)
-    if (
-        subject is None
-        or subject.department_id != profile.department_id
-        or subject.year != profile.year
-        or subject.semester != profile.semester
-    ):
+    subject = db.scalar(
+        select(Subject).where(
+            Subject.code == subject_code,
+            Subject.department_id == profile.department_id,
+            Subject.year == profile.year,
+            Subject.semester == profile.semester,
+        )
+    )
+    if subject is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found.")
     return subject
 
@@ -129,7 +131,7 @@ def _doubt_view(doubt: StudentDoubt, subject: Subject) -> DoubtView:
 
 
 def ask_doubt(db: Session, student: User, payload: DoubtAsk) -> DoubtView:
-    subject = _subject_for_student(db, student, payload.subject_id)
+    subject = _subject_for_student(db, student, payload.subject_code)
 
     used = _used_today(db, student.id)
     if used >= DAILY_LIMIT:

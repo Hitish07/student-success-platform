@@ -12,10 +12,13 @@ QuestionText = Annotated[
 ]
 
 
+SubjectCode = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=16)]
+
+
 class DoubtAsk(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    subject_id: int = Field(gt=0)
+    subject_code: SubjectCode
     question: QuestionText
 
 

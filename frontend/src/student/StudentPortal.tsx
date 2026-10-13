@@ -925,10 +925,168 @@ function formatDate(value: string): string {
     : new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
 }
 
+interface DoubtSubject {
+  code: string;
+  name: string;
+  faculty: string[];
+}
+
+interface DoubtSubjectsPayload {
+  year: number;
+  semester: number;
+  subjects: DoubtSubject[];
+}
+
+interface DoubtView {
+  id: number;
+  subject_id: number;
+  subject_code: string;
+  subject_name: string;
+  question: string;
+  answer: string;
+  created_at: string;
+}
+
+interface DoubtList {
+  doubts: DoubtView[];
+  remaining_today: number;
+}
+
+function StudentDoubts() {
+  const { accessToken } = useAuth();
+  const subjects = useStudentResource<DoubtSubjectsPayload>("/student/subjects");
+  const doubts = useStudentResource<DoubtList>("/student/doubts");
+  const [subjectCode, setSubjectCode] = useState("");
+  const [question, setQuestion] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const subjectList = subjects.data?.subjects ?? [];
+  const selected = subjectList.find((item) => item.code === subjectCode);
+
+  async function ask() {
+    setError(null);
+    setSuccess(null);
+    if (!subjectCode) {
+      setError("Choose a subject before asking.");
+      return;
+    }
+    if (question.trim().length < 5) {
+      setError("Write a slightly longer question.");
+      return;
+    }
+    setAsking(true);
+    try {
+      const created = await apiRequest<DoubtView>(
+        "/student/doubts",
+        {
+          method: "POST",
+          body: JSON.stringify({ subject_code: subjectCode, question: question.trim() }),
+        },
+        accessToken ?? undefined,
+      );
+      setQuestion("");
+      setSuccess("Question answered below.");
+      doubts.reload();
+      return created;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to ask right now.");
+    } finally {
+      setAsking(false);
+    }
+  }
+
+  return (
+    <>
+      <header className="student-heading">
+        <p className="eyebrow">Study helper</p>
+        <h1 className="portal-title">Ask a doubt</h1>
+        <p className="intro">
+          Get a plain-English explanation of the logic and a few different ways to think about the problem.
+          The helper will not write the answer for you.
+        </p>
+      </header>
+      <section className="student-panel" aria-labelledby="ask-doubt-heading">
+        <h2 id="ask-doubt-heading">Ask a question</h2>
+        {subjects.isLoading && <p className="student-state" role="status">Loading your subjects...</p>}
+        {subjects.error && <p className="form-error" role="alert">{subjects.error}</p>}
+        {subjectList.length > 0 && (
+          <div className="faculty-form">
+            <label htmlFor="doubt-subject">Subject</label>
+            <select
+              id="doubt-subject"
+              onChange={(event) => setSubjectCode(event.target.value)}
+              value={subjectCode}
+            >
+              <option value="">Choose a subject</option>
+              {subjectList.map((subject) => (
+                <option key={subject.code} value={subject.code}>
+                  {subject.code} - {subject.name}
+                </option>
+              ))}
+            </select>
+            <label htmlFor="doubt-question">Your question</label>
+            <textarea
+              id="doubt-question"
+              maxLength={2000}
+              onChange={(event) => setQuestion(event.target.value)}
+              rows={5}
+              value={question}
+            />
+            <p className="student-state">
+              Your faculty can see the topics you ask about, not your name.
+              {doubts.data ? ` You have ${doubts.data.remaining_today} questions left today.` : ""}
+            </p>
+            {error && <p className="form-error" role="alert">{error}</p>}
+            {success && <p className="form-success" role="status">{success}</p>}
+            <div>
+              <button
+                className="button"
+                disabled={asking || !subjectCode || question.trim().length < 5}
+                onClick={() => void ask()}
+                type="button"
+              >
+                {asking ? "Asking..." : "Ask"}
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+      <section className="student-panel" aria-labelledby="doubt-history-heading">
+        <h2 id="doubt-history-heading">Your previous questions</h2>
+        <ScreenState
+          emptyMessage="You have not asked a question yet."
+          error={doubts.error}
+          isEmpty={!doubts.data || doubts.data.doubts.length === 0}
+          isLoading={doubts.isLoading}
+          onRetry={doubts.reload}
+        >
+          {doubts.data && doubts.data.doubts.length > 0 && (
+            <div className="feedback-list">
+              {doubts.data.doubts.map((item) => (
+                <article className="feedback-card" key={item.id}>
+                  <div className="feedback-meta">
+                    <strong>{item.subject_code} - {item.subject_name}</strong>
+                    <span>{formatDate(item.created_at)}</span>
+                  </div>
+                  <p><strong>Q:</strong> {item.question}</p>
+                  <p style={{ whiteSpace: "pre-wrap" }}><strong>A:</strong> {item.answer}</p>
+                </article>
+              ))}
+            </div>
+          )}
+        </ScreenState>
+      </section>
+    </>
+  );
+}
+
 const studentNavigation = [
   { to: "/student", label: "Overview", end: true },
   { to: "/student/journey", label: "My journey", end: false },
   { to: "/student/feedback", label: "Feedback", end: false },
+  { to: "/student/doubts", label: "Doubts", end: false },
 ];
 
 export function StudentPortalLayout() {
@@ -985,3 +1143,4 @@ export function StudentPortalLayout() {
 export const StudentDashboard = DashboardScreen;
 export const StudentJourney = JourneyScreen;
 export const StudentFeedback = FeedbackScreen;
+export const StudentDoubts = StudentDoubts;
