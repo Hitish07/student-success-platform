@@ -75,3 +75,25 @@ def test_expired_or_invalid_token_and_weak_password_rejected(client, database, c
     expired = client.post("/auth/reset-password", json={"token": token, "new_password": NEW})
     assert expired.status_code == 400
     assert login_status(client, OLD) == 200
+
+
+def test_change_password_requires_correct_current_password(client, database):
+    make_user(database)
+    login = client.post("/auth/login", json={"email": EMAIL, "password": OLD})
+    headers = {"Authorization": "Bearer " + login.json()["access_token"]}
+
+    wrong = client.post(
+        "/auth/change-password", headers=headers, json={"current_password": "WrongPassword999!", "new_password": NEW}
+    )
+    assert wrong.status_code == 400
+    same = client.post("/auth/change-password", headers=headers, json={"current_password": OLD, "new_password": OLD})
+    assert same.status_code == 400
+    short = client.post("/auth/change-password", headers=headers, json={"current_password": OLD, "new_password": "short"})
+    assert short.status_code == 422
+    assert client.post("/auth/change-password", json={"current_password": OLD, "new_password": NEW}).status_code in {401, 403}
+    assert login_status(client, OLD) == 200
+
+    done = client.post("/auth/change-password", headers=headers, json={"current_password": OLD, "new_password": NEW})
+    assert done.status_code == 200
+    assert login_status(client, NEW) == 200
+    assert login_status(client, OLD) == 401

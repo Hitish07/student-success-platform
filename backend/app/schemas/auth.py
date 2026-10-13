@@ -148,3 +148,15 @@ class ResetPasswordRequest(StrictSchema):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+class ChangePasswordRequest(StrictSchema):
+    current_password: str = Field(min_length=1, max_length=72)
+    new_password: str = Field(min_length=12, max_length=72)
+
+    @field_validator("current_password", "new_password")
+    @classmethod
+    def enforce_bcrypt_byte_limit(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("Password must be at most 72 UTF-8 bytes.")
+        return value

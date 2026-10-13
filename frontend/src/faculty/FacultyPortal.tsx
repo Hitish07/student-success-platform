@@ -1,3 +1,4 @@
+import { ChangePassword } from "../auth/ChangePassword";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 
@@ -759,7 +760,8 @@ export function FacultyPortalLayout() {
   return (
     <main className="portal-page">
       <header className="topbar"><Link className="brand" to="/faculty"><span className="brand-mark" aria-hidden="true">S</span>Student Success</Link>
-        <div className="account-menu"><span className="account-name">{user?.full_name}</span><button className="button button-small button-outline" disabled={isLoggingOut} onClick={handleLogout} type="button">{isLoggingOut ? "Signing out…" : "Sign out"}</button></div>
+        <div className="account-menu"><span className="account-name">{user?.full_name}</span><ChangePassword />
+<button className="button button-small button-outline" disabled={isLoggingOut} onClick={handleLogout} type="button">{isLoggingOut ? "Signing out…" : "Sign out"}</button></div>
       </header>
       <nav aria-label="Faculty portal" className="student-navigation">{facultyNavigation.map((item) => <NavLink className={({ isActive }) => `student-nav-link${isActive ? " active" : ""}`} end={item.end} key={item.to} to={item.to}>{item.label}</NavLink>)}</nav>
       <div className="student-content">{error && <p className="form-error" role="alert">{error}</p>}<Outlet /></div>

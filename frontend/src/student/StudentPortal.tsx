@@ -1,3 +1,4 @@
+import { ChangePassword } from "../auth/ChangePassword";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 
@@ -845,7 +846,8 @@ export function StudentPortalLayout() {
         </Link>
         <div className="account-menu">
           <span className="account-name">{user?.full_name}</span>
-          <button className="button button-small button-outline" disabled={isLoggingOut} onClick={handleLogout} type="button">
+          <ChangePassword />
+<button className="button button-small button-outline" disabled={isLoggingOut} onClick={handleLogout} type="button">
             {isLoggingOut ? "Signing out…" : "Sign out"}
           </button>
         </div>

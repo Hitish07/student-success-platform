@@ -26,6 +26,10 @@ from app.services.auth_service import (
 from app.schemas.auth import ForgotPasswordRequest, MessageResponse, ResetPasswordRequest
 from app.services.password_reset import request_password_reset, reset_password
 
+from app.core.security import hash_password, verify_password
+from app.models.models import User
+from app.schemas.auth import ChangePasswordRequest
+
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
 
@@ -104,3 +108,18 @@ def reset_password_endpoint(payload: ResetPasswordRequest, db: DatabaseSession) 
             detail="This reset link is invalid or has expired.",
         )
     return {"message": "Your password was updated. You can sign in now."}
+
+
+@router.post("/change-password", response_model=MessageResponse)
+def change_password(payload: ChangePasswordRequest, user: AuthenticatedUser, db: DatabaseSession) -> dict:
+    account = db.get(User, user.id)
+    if account is None or not verify_password(payload.current_password, account.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Your current password is incorrect.")
+    if payload.current_password == payload.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Choose a new password that differs from the current one.",
+        )
+    account.password_hash = hash_password(payload.new_password)
+    db.commit()
+    return {"message": "Your password was changed."}

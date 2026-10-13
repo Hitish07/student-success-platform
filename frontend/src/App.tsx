@@ -1,3 +1,4 @@
+import { ForgotPasswordPage, ResetPasswordPage } from "./auth/PasswordReset";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   Link,
@@ -168,6 +169,7 @@ function LoginPage() {
           {isSubmitting ? "Signing in…" : "Sign in"}
         </button>
       </form>
+      <p className="auth-switch"><Link to="/forgot-password">Forgot password?</Link></p>
       <section className="demo-login" aria-label="Analytics demo accounts">
         <p>Or open a seeded analytics demo:</p>
         <div>
@@ -650,6 +652,8 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/register/faculty" element={<FacultyRegisterPage />} />
       <Route element={<RequirePortalRole role="student" />}>
