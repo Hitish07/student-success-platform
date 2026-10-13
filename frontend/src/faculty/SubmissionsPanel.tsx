@@ -12,6 +12,16 @@ interface GradingRow {
   marks: number | string | null;
   feedback: string | null;
   max_marks: number | string;
+  tab_switches: number;
+  redo_count: number;
+}
+
+interface AttemptRow {
+  id: number;
+  student_name: string;
+  student_email: string;
+  status: string;
+  tab_switches: number;
 }
 
 function GradeRowEditor({ row, onSaved }: { row: GradingRow; onSaved: () => void }) {
@@ -49,6 +59,7 @@ function GradeRowEditor({ row, onSaved }: { row: GradingRow; onSaved: () => void
     <div style={{ display: "grid", gap: "0.5rem", padding: "0.75rem 0", borderTop: "1px solid #ddd" }}>
       <strong>{row.student_name}</strong>
       <span>{row.student_email} · submitted {new Date(row.submitted_at).toLocaleString()}</span>
+      <span>Tab switches: {row.tab_switches} · Cancelled attempts: {row.redo_count}</span>
       <p style={{ whiteSpace: "pre-wrap" }}>{row.answer_text ?? "No answer text was saved for this submission."}</p>
       <label htmlFor={`grade-marks-${row.id}`}>Marks (out of {row.max_marks})</label>
       <input
@@ -82,6 +93,7 @@ export function SubmissionsPanel({ assignmentId }: { assignmentId: number }) {
   const { accessToken } = useAuth();
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<GradingRow[] | null>(null);
+  const [attempts, setAttempts] = useState<AttemptRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -95,6 +107,12 @@ export function SubmissionsPanel({ assignmentId }: { assignmentId: number }) {
         accessToken ?? undefined,
       );
       setRows(data);
+      const activity = await apiRequest<AttemptRow[]>(
+        `/faculty/assignments/${assignmentId}/attempts`,
+        { method: "GET" },
+        accessToken ?? undefined,
+      );
+      setAttempts(activity);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to load submissions.");
     } finally {
@@ -126,6 +144,18 @@ export function SubmissionsPanel({ assignmentId }: { assignmentId: number }) {
                 Try again
               </button>
             </p>
+          )}
+          {attempts.length > 0 && (
+            <div style={{ padding: "0.5rem 0" }}>
+              <strong>Attempts in progress or cancelled</strong>
+              <ul>
+                {attempts.map((item) => (
+                  <li key={item.id}>
+                    {item.student_name} ({item.student_email}) · {item.status} · {item.tab_switches} tab switches
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
           {rows && rows.length === 0 && <p>No students have submitted this assignment yet.</p>}
           {rows && rows.map((row) => <GradeRowEditor key={row.id} onSaved={() => void load()} row={row} />)}
