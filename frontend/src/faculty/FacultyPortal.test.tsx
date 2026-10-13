@@ -41,6 +41,27 @@ function installFacultyApi(mode: "populated" | "empty" | "error" = "populated") 
             open_alerts: 1,
           };
         }
+      } else if (url.endsWith("/faculty/doubts")) {
+        body = mode === "empty"
+          ? { topics: [], total_doubts: 0 }
+          : {
+              topics: [
+                {
+                  subject_id: 1,
+                  subject_code: "CS201",
+                  subject_name: "Data Structures",
+                  total: 3,
+                  recent: [
+                    {
+                      question: "How do I think about recursion?",
+                      answer_preview: "Think about the base case first...",
+                      created_at: "2026-10-13T10:00:00Z",
+                    },
+                  ],
+                },
+              ],
+              total_doubts: 3,
+            };
       } else {
         body = [];
       }
@@ -96,4 +117,21 @@ describe("faculty portal", () => {
     expect(await screen.findByText("Faculty dashboard unavailable.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
   });
+
+  it("shows doubts grouped by subject on the faculty doubts screen", async () => {
+    installFacultyApi("populated");
+
+    render(
+      <MemoryRouter initialEntries={["/faculty/doubts"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Doubts and questions")).toBeTruthy();
+    expect(await screen.findByText("CS201 - Data Structures")).toBeTruthy();
+    expect(screen.getByText("3 questions")).toBeTruthy();
+    expect(screen.getByText(/How do I think about recursion\?/)).toBeTruthy();
+    expect(screen.getByText(/base case first/i)).toBeTruthy();
+  });
+
 });
