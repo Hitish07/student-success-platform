@@ -130,6 +130,19 @@ const principalDashboard = {
     overall_average: 71.0,
     note: "Average of aptitude, coding, and mock interview scores.",
   },
+  placement_trend: {
+    points: [
+      { label: "2026-05", value: 0 },
+      { label: "2026-06", value: 1 },
+      { label: "2026-07", value: 2 },
+      { label: "2026-08", value: 3 },
+      { label: "2026-09", value: 4 },
+      { label: "2026-10", value: 5 },
+    ],
+    total_placed: 5,
+    placement_rate: 0.25,
+    note: "Distinct students with an accepted or joined placement.",
+  },
   ai_summary: "Computer Science leads the campus with a rising average, while Mechanical has slipped slightly over the last quarter.",
 };
 
@@ -256,6 +269,9 @@ describe("dean and principal analytics dashboard", () => {
     expect(screen.getByText("68.2")).toBeTruthy();
     expect(screen.getAllByText("Placement readiness").length).toBeGreaterThan(0);
     expect(screen.getByText("71.0")).toBeTruthy();
+    expect(screen.getByText("Students placed")).toBeTruthy();
+    expect(screen.getByText("5")).toBeTruthy();
+    expect(screen.getByText("Placements over time")).toBeTruthy();
   });
 
 });
