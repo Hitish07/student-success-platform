@@ -1,5 +1,5 @@
 import { ChangePassword } from "../auth/ChangePassword";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 
 import { apiRequest } from "../api";
@@ -358,14 +358,91 @@ function MyAcademics() {
   );
 }
 
+interface AttemptState {
+  attempt_id: number;
+  tab_switches: number;
+  limit: number;
+  status: string;
+  voided_attempts: number;
+}
+
 function StudentAssignmentList() {
   const { accessToken } = useAuth();
   const assignments = useStudentResource<StudentAssignment[]>("/student/assignments");
   const [openId, setOpenId] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [attempts, setAttempts] = useState<Record<number, AttemptState>>({});
+  const [activeId, setActiveId] = useState<number | null>(null);
   const [submittingId, setSubmittingId] = useState<number | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const awayRef = useRef(false);
+  const reportRef = useRef<(id: number) => Promise<void>>(async () => {});
+
+  async function startAttempt(assignmentId: number) {
+    try {
+      const attempt = await apiRequest<AttemptState>(
+        `/student/assignments/${assignmentId}/attempt`,
+        { method: "POST" },
+        accessToken ?? undefined,
+      );
+      setAttempts((current) => ({ ...current, [assignmentId]: attempt }));
+      setActiveId(assignmentId);
+    } catch (cause) {
+      setSubmitError(cause instanceof Error ? cause.message : "Unable to start this assignment.");
+    }
+  }
+
+  async function reportSwitch(assignmentId: number) {
+    try {
+      const attempt = await apiRequest<AttemptState>(
+        `/student/assignments/${assignmentId}/tab-switch`,
+        { method: "POST" },
+        accessToken ?? undefined,
+      );
+      setAttempts((current) => ({ ...current, [assignmentId]: attempt }));
+      if (attempt.status === "voided") {
+        setActiveId(null);
+        setAnswers((current) => ({ ...current, [assignmentId]: "" }));
+        setSubmitMessage(null);
+        setSubmitError(
+          `You switched tabs more than ${attempt.limit} times. This attempt was cancelled and your answer was cleared. Write your answer again.`,
+        );
+        await startAttempt(assignmentId);
+      }
+    } catch {
+      // A failed report is ignored; the server keeps the authoritative count.
+    }
+  }
+  reportRef.current = reportSwitch;
+
+  useEffect(() => {
+    if (activeId === null) return undefined;
+    const away = () => {
+      if (awayRef.current) return;
+      awayRef.current = true;
+      void reportRef.current(activeId);
+    };
+    const back = () => {
+      awayRef.current = false;
+    };
+    const onVisibility = () => {
+      if (document.hidden) away();
+      else back();
+    };
+    window.addEventListener("blur", away);
+    window.addEventListener("focus", back);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("blur", away);
+      window.removeEventListener("focus", back);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [activeId]);
+
+  function blockPaste() {
+    setSubmitError("Pasting is disabled. Type your answer yourself.");
+  }
 
   async function submit(assignmentId: number) {
     const answer = (answers[assignmentId] ?? "").trim();
@@ -381,6 +458,7 @@ function StudentAssignmentList() {
         method: "POST",
         body: JSON.stringify({ answer_text: answer }),
       }, accessToken ?? undefined);
+      setActiveId(null);
       setSubmitMessage("Assignment submitted.");
       assignments.reload();
     } catch (cause) {
@@ -417,6 +495,7 @@ function StudentAssignmentList() {
               {assignments.data.map((assignment) => {
                 const isOpen = openId === assignment.id;
                 const isSubmitted = assignment.status === "submitted";
+                const attempt = attempts[assignment.id];
                 return (
                   <tbody key={assignment.id}>
                     <tr>
@@ -428,7 +507,15 @@ function StudentAssignmentList() {
                         <button
                           aria-expanded={isOpen}
                           className="button button-small button-outline"
-                          onClick={() => setOpenId(isOpen ? null : assignment.id)}
+                          onClick={() => {
+                            if (isOpen) {
+                              setOpenId(null);
+                              setActiveId(null);
+                              return;
+                            }
+                            setOpenId(assignment.id);
+                            if (!isSubmitted) void startAttempt(assignment.id);
+                          }}
                           type="button"
                         >
                           {isOpen ? "Close" : isSubmitted ? "View" : "Open"}
@@ -448,18 +535,24 @@ function StudentAssignmentList() {
                             {isSubmitted ? (
                               <>
                                 {assignment.marks != null && (
-                              <p><strong>Marks: {assignment.marks} / {assignment.max_marks}</strong></p>
-                            )}
-                            {assignment.feedback && (
-                              <p style={{ whiteSpace: "pre-wrap" }}>Faculty feedback: {assignment.feedback}</p>
-                            )}
-                            <p><strong>Your submitted answer</strong></p>
+                                  <p><strong>Marks: {assignment.marks} / {assignment.max_marks}</strong></p>
+                                )}
+                                {assignment.feedback && (
+                                  <p style={{ whiteSpace: "pre-wrap" }}>Faculty feedback: {assignment.feedback}</p>
+                                )}
+                                <p><strong>Your submitted answer</strong></p>
                                 <p style={{ whiteSpace: "pre-wrap" }}>
                                   {assignment.answer_text ?? "No answer text was saved for this submission."}
                                 </p>
                               </>
                             ) : (
                               <>
+                                {attempt && (
+                                  <p role="status">
+                                    Tab switches: {attempt.tab_switches} of {attempt.limit} allowed. Switching tabs more than {attempt.limit} times cancels this attempt and clears your answer.
+                                    {attempt.voided_attempts > 0 ? ` Cancelled attempts so far: ${attempt.voided_attempts}.` : ""}
+                                  </p>
+                                )}
                                 <label htmlFor={`assignment-answer-${assignment.id}`}>Your answer</label>
                                 <textarea
                                   id={`assignment-answer-${assignment.id}`}
@@ -467,6 +560,15 @@ function StudentAssignmentList() {
                                   onChange={(event) =>
                                     setAnswers((current) => ({ ...current, [assignment.id]: event.target.value }))
                                   }
+                                  onContextMenu={(event) => event.preventDefault()}
+                                  onDrop={(event) => {
+                                    event.preventDefault();
+                                    blockPaste();
+                                  }}
+                                  onPaste={(event) => {
+                                    event.preventDefault();
+                                    blockPaste();
+                                  }}
                                   rows={8}
                                   value={answers[assignment.id] ?? ""}
                                 />
