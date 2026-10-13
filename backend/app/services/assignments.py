@@ -1,11 +1,12 @@
-from datetime import date
+from datetime import date, datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
     Assignment,
+    AssignmentAttempt,
     AssignmentSubmission,
     AuditLog,
     FacultySubject,
@@ -15,6 +16,8 @@ from app.models import (
 )
 from app.schemas.assignments import (
     AssignmentCreate,
+    AttemptActivityView,
+    AttemptView,
     AssignmentSubmit,
     AssignmentSubmissionView,
     FacultyAssignmentView,
@@ -219,12 +222,21 @@ def submit_assignment(
     if existing is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Assignment already submitted.")
 
+    attempt = _active_attempt(db, assignment.id, student.id)
+    if attempt is None and _voided_count(db, assignment.id, student.id) > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Your previous attempt was cancelled. Start a new attempt first.",
+        )
     submission = AssignmentSubmission(
         assignment_id=assignment.id,
         student_id=student.id,
         answer_text=payload.answer_text,
+        tab_switches=attempt.tab_switches if attempt is not None else 0,
     )
     db.add(submission)
+    if attempt is not None:
+        attempt.status = "submitted"
     db.commit()
     db.refresh(submission)
     return AssignmentSubmissionView(
@@ -238,6 +250,7 @@ def _grading_view(
     submission: AssignmentSubmission,
     assignment: Assignment,
     student: User,
+    redo_count: int = 0,
 ) -> SubmissionGradingView:
     return SubmissionGradingView(
         id=submission.id,
@@ -250,6 +263,8 @@ def _grading_view(
         marks=submission.marks,
         feedback=submission.feedback,
         max_marks=assignment.max_marks,
+        tab_switches=submission.tab_switches or 0,
+        redo_count=redo_count,
     )
 
 
@@ -267,7 +282,20 @@ def get_assignment_submissions(
         .where(AssignmentSubmission.assignment_id == assignment.id)
         .order_by(AssignmentSubmission.submitted_at, AssignmentSubmission.id)
     ).all()
-    return [_grading_view(submission, assignment, student) for submission, student in rows]
+    voided = dict(
+        db.execute(
+            select(AssignmentAttempt.student_id, func.count())
+            .where(
+                AssignmentAttempt.assignment_id == assignment.id,
+                AssignmentAttempt.status == "voided",
+            )
+            .group_by(AssignmentAttempt.student_id)
+        ).all()
+    )
+    return [
+        _grading_view(submission, assignment, student, voided.get(student.id, 0))
+        for submission, student in rows
+    ]
 
 
 def grade_submission(
@@ -298,4 +326,150 @@ def grade_submission(
     db.commit()
     db.refresh(submission)
     student = db.get(User, submission.student_id)
-    return _grading_view(submission, assignment, student)
+    return _grading_view(
+        submission, assignment, student, _voided_count(db, assignment.id, student.id)
+    )
+
+
+TAB_SWITCH_LIMIT = 3
+
+
+def _active_attempt(db: Session, assignment_id: int, student_id: int) -> AssignmentAttempt | None:
+    return db.scalar(
+        select(AssignmentAttempt)
+        .where(
+            AssignmentAttempt.assignment_id == assignment_id,
+            AssignmentAttempt.student_id == student_id,
+            AssignmentAttempt.status == "active",
+        )
+        .order_by(AssignmentAttempt.id.desc())
+    )
+
+
+def _voided_count(db: Session, assignment_id: int, student_id: int) -> int:
+    return (
+        db.scalar(
+            select(func.count())
+            .select_from(AssignmentAttempt)
+            .where(
+                AssignmentAttempt.assignment_id == assignment_id,
+                AssignmentAttempt.student_id == student_id,
+                AssignmentAttempt.status == "voided",
+            )
+        )
+        or 0
+    )
+
+
+def _attempt_view(db: Session, attempt: AssignmentAttempt) -> AttemptView:
+    return AttemptView(
+        attempt_id=attempt.id,
+        assignment_id=attempt.assignment_id,
+        tab_switches=attempt.tab_switches,
+        limit=TAB_SWITCH_LIMIT,
+        status=attempt.status,
+        voided_attempts=_voided_count(db, attempt.assignment_id, attempt.student_id),
+    )
+
+
+def start_attempt(db: Session, student: User, assignment_id: int) -> AttemptView:
+    profile = _student_profile(db, student)
+    assignment = db.get(Assignment, assignment_id)
+    subject = db.get(Subject, assignment.subject_id) if assignment is not None else None
+    if (
+        assignment is None
+        or subject is None
+        or subject.department_id != profile.department_id
+        or subject.year != profile.year
+        or subject.semester != profile.semester
+    ):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found.")
+    existing = db.scalar(
+        select(AssignmentSubmission.id).where(
+            AssignmentSubmission.assignment_id == assignment.id,
+            AssignmentSubmission.student_id == student.id,
+        )
+    )
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Assignment already submitted.")
+    attempt = _active_attempt(db, assignment.id, student.id)
+    if attempt is None:
+        attempt = AssignmentAttempt(assignment_id=assignment.id, student_id=student.id)
+        db.add(attempt)
+        db.commit()
+        db.refresh(attempt)
+    return _attempt_view(db, attempt)
+
+
+def record_tab_switch(db: Session, student: User, assignment_id: int) -> AttemptView:
+    profile = _student_profile(db, student)
+    assignment = db.get(Assignment, assignment_id)
+    subject = db.get(Subject, assignment.subject_id) if assignment is not None else None
+    if (
+        assignment is None
+        or subject is None
+        or subject.department_id != profile.department_id
+        or subject.year != profile.year
+        or subject.semester != profile.semester
+    ):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found.")
+    existing = db.scalar(
+        select(AssignmentSubmission.id).where(
+            AssignmentSubmission.assignment_id == assignment.id,
+            AssignmentSubmission.student_id == student.id,
+        )
+    )
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Assignment already submitted.")
+    attempt = _active_attempt(db, assignment.id, student.id)
+    if attempt is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No active attempt. Start a new attempt first.",
+        )
+    attempt.tab_switches += 1
+    if attempt.tab_switches > TAB_SWITCH_LIMIT:
+        attempt.status = "voided"
+        attempt.voided_at = datetime.now(timezone.utc)
+        db.add(
+            AuditLog(
+                actor_id=student.id,
+                action="assignment.attempt_voided",
+                entity_type="assignment_attempt",
+                entity_id=str(attempt.id),
+            )
+        )
+    db.commit()
+    db.refresh(attempt)
+    return _attempt_view(db, attempt)
+
+
+def get_assignment_attempts(
+    db: Session,
+    faculty: User,
+    assignment_id: int,
+) -> list[AttemptActivityView]:
+    assignment = db.get(Assignment, assignment_id)
+    if assignment is None or assignment.faculty_id != faculty.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found.")
+    rows = db.execute(
+        select(AssignmentAttempt, User)
+        .join(User, User.id == AssignmentAttempt.student_id)
+        .where(
+            AssignmentAttempt.assignment_id == assignment.id,
+            AssignmentAttempt.status != "submitted",
+        )
+        .order_by(AssignmentAttempt.started_at, AssignmentAttempt.id)
+    ).all()
+    return [
+        AttemptActivityView(
+            id=attempt.id,
+            student_id=user.id,
+            student_name=user.full_name,
+            student_email=user.email,
+            status=attempt.status,
+            tab_switches=attempt.tab_switches,
+            started_at=attempt.started_at,
+        )
+        for attempt, user in rows
+    ]
