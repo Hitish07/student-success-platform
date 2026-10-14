@@ -11,7 +11,7 @@
 
   /* surfaces */
   --color-bg:             #faf5ff;
-  --color-surface:        var(--color-surface);
+  --color-surface:        #ffffff;
   --color-surface-alt:    #f5f3ff;
   --color-border:         #e9d5ff;
   --color-border-soft:    #f3e8ff;
@@ -149,6 +149,18 @@ select:focus-visible {
   font-weight: 650;
   text-decoration: none;
   transition: background 120ms ease, transform 120ms ease;
+}
+
+.button,
+.auth-form .button,
+.student-feedback-form .button,
+.faculty-form .button {
+  color: #ffffff;
+}
+
+.button-outline,
+.button-outline:visited {
+  color: var(--color-primary);
 }
 
 .button:hover:not(:disabled) {
@@ -336,7 +348,7 @@ code {
   margin: 10px 0 0;
   border-radius: 8px;
   padding: 11px 13px;
-  background: var(--color-surface)1f0;
+  background: rgba(255, 255, 255, 0.12);
   color: #9b2f2a;
   font-size: 13px;
   line-height: 1.5;
@@ -1328,7 +1340,7 @@ code {
 .confidence-badge {
   border-radius: 999px;
   padding: 8px 11px;
-  background: var(--color-surface)4d8;
+  background: rgba(255, 255, 255, 0.3);
   color: #93630b;
   font-size: 10px;
   font-weight: 700;
@@ -1472,7 +1484,7 @@ code {
   gap: 16px;
   border-style: solid;
   border-color: #f0d7d4;
-  background: var(--color-surface)8f7;
+  background: rgba(255, 255, 255, 0.56);
   color: #913a35;
 }
 
@@ -1498,7 +1510,7 @@ code {
 }
 
 .risk-medium {
-  background: var(--color-surface)4d8;
+  background: rgba(255, 255, 255, 0.3);
   color: #94640a;
 }
 
