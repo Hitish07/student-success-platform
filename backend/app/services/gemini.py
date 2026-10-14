@@ -167,16 +167,15 @@ def explain_logic_strict(question: str, subject_label: str = "") -> str:
 
 
 DASHBOARD_SYSTEM_INSTRUCTION = (
-    "You are an analyst writing a short briefing for a college principal. "
-    "You are given academic and placement numbers for the institution. "
-    "Write ONE paragraph in plain English, under 120 words. Cover:\n"
-    "1. The overall academic trajectory (improving, flat, or declining).\n"
-    "2. The strongest and weakest departments by average marks.\n"
-    "3. The placement picture: total placed and the monthly trend.\n"
-    "4. One thing worth the principal's attention.\n"
-    "Rules: no bullet points, no headings, no numbers you were not given, "
-    "no opinions about individual students. Speak about departments and the "
-    "institution as a whole."
+    "You are a data analyst writing a briefing for a college principal. "
+    "The user will give you a set of numbers. Your ONLY job is to write a single "
+    "paragraph of 3 to 5 sentences that summarises those specific numbers. "
+    "Do NOT explain how to write a briefing. Do NOT offer approaches or options. "
+    "Do NOT use bullet points, headings, or numbered lists. "
+    "Just the summary paragraph itself. "
+    "Cover: the academic trajectory, the strongest department, the weakest "
+    "department, and one thing worth attention. Use only the numbers provided. "
+    "Under 120 words."
 )
 
 
@@ -222,4 +221,9 @@ def summarize_dashboard(stats: dict) -> str:
         "Here are the latest institution numbers. Write the briefing.\n\n"
         + body
     )
-    return _post(prompt, subject_label="", extra_instruction="")
+    return _post(
+        prompt,
+        subject_label="",
+        extra_instruction="",
+        system_override=DASHBOARD_SYSTEM_INSTRUCTION,
+    )
