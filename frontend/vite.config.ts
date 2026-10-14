@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       proxy: Object.fromEntries(
-        ["/auth", "/portals", "/student", "/faculty", "/analytics", "/health"].map((path) => [
+        ["/auth", "/portals", "/student", "/faculty", "/analytics", "/principal", "/health"].map((path) => [
           path,
           { target: apiTarget, changeOrigin: true },
         ]),
