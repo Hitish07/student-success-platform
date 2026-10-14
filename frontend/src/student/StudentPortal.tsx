@@ -1,4 +1,6 @@
 import { ChangePassword } from "../auth/ChangePassword";
+import { SuccessScoreHero } from "./SuccessScoreHero";
+import type { SuccessScoreSummary } from "./SuccessScoreHero";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 
@@ -38,6 +40,7 @@ interface Dashboard {
   enrolled_courses: number;
   courses: CourseProgress[];
   risk: PersonalRisk | null;
+  success_score: SuccessScoreSummary | null;
 }
 
 interface AcademicProfile {
@@ -618,6 +621,7 @@ function DashboardScreen() {
       >
         {data && (
           <>
+            {data.success_score && <SuccessScoreHero score={data.success_score} />}
             <div className="student-metrics">
               <MetricCard label="Attendance" value={data.attendance_percentage} />
               <MetricCard label="Average marks" value={data.marks_percentage} />
