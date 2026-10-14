@@ -109,11 +109,11 @@ interface DashboardData {
 }
 
 const RISK_COLORS: Record<RiskLevel, string> = {
-  Low: "#2b8a62",
-  Medium: "#d39a20",
-  High: "#ca5144",
+  Low: "#10b981",
+  Medium: "#f59e0b",
+  High: "#ef4444",
 };
-const SEGMENT_COLORS = ["#277c6c", "#3d83a3", "#825caf", "#d18a32", "#59727e"];
+const SEGMENT_COLORS = ["#7c3aed", "#ec4899", "#0ea5e9", "#f59e0b", "#64748b"];
 function sectionsFor(role: "dean" | "principal"): { id: Section; label: string }[] {
   const base: { id: Section; label: string }[] = [
     { id: "overview", label: "Overview" },
@@ -280,7 +280,7 @@ function DriverChart({ title, drivers }: { title: string; drivers: Driver[] }) {
               <Tooltip formatter={(value) => [`${Number(value).toFixed(2)} points`, "Contribution"]} />
               <Bar dataKey="contribution" radius={[0, 5, 5, 0]}>
                 {values.map((value, index) => (
-                  <Cell key={`${value.indicator}-${index}`} fill={value.contribution >= 0 ? "#2b8a62" : "#ca5144"} />
+                  <Cell key={`${value.indicator}-${index}`} fill={value.contribution >= 0 ? "#10b981" : "#ef4444"} />
                 ))}
               </Bar>
             </BarChart>
@@ -390,7 +390,7 @@ interface PrincipalDashboardData {
 }
 
 const DEPARTMENT_COLORS = [
-  "#277c6c", "#3d83a3", "#825caf", "#d18a32", "#59727e", "#b25a5a", "#4a7f3f",
+  "#7c3aed", "#0ea5e9", "#ec4899", "#f59e0b", "#64748b", "#a78bfa", "#10b981",
 ];
 
 function PrincipalTrendsPanel() {
@@ -498,7 +498,7 @@ function PrincipalTrendsPanel() {
               <Line
                 dataKey="Institution"
                 type="monotone"
-                stroke="#1a1a1a"
+                stroke="#1e1b4b"
                 strokeWidth={3}
                 dot={{ r: 3 }}
               />
@@ -535,7 +535,7 @@ function PrincipalTrendsPanel() {
                 dataKey="value"
                 name="Placed"
                 type="monotone"
-                stroke="#277c6c"
+                stroke="#7c3aed"
                 strokeWidth={3}
                 dot={{ r: 3 }}
               />
@@ -867,7 +867,7 @@ export function AnalyticsDashboard({ role }: { role: "dean" | "principal" }) {
                           <XAxis dataKey="range" label={{ value: "Success Score range", position: "insideBottom", offset: -12 }} />
                           <YAxis allowDecimals={false} label={{ value: "Students", angle: -90, position: "insideLeft" }} />
                           <Tooltip />
-                          <Bar dataKey="students" name="Students" fill="#277c6c" radius={[5, 5, 0, 0]} />
+                          <Bar dataKey="students" name="Students" fill="#7c3aed" radius={[5, 5, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
