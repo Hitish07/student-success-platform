@@ -18,6 +18,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { apiRequest } from "../api";
 import { SkeletonChart, SkeletonRows } from "../ui/Skeleton";
 import { Modal } from "../ui/Modal";
+import { useReveal } from "../ui/useReveal";
+import { AnimatedNumber } from "../ui/AnimatedNumber";
 import { useAuth } from "../auth/AuthContext";
 
 type RiskLevel = "Low" | "Medium" | "High";
@@ -450,8 +452,13 @@ function PrincipalTrendsPanel() {
     return row;
   });
 
+  const { ref: revealRef, shown: revealShown } = useReveal<HTMLDivElement>();
+
   return (
-    <>
+    <div
+      className={`reveal ${revealShown ? "reveal-shown" : ""}`}
+      ref={revealRef}
+    >
       {data.ai_summary && (
         <section className="analytics-panel analytics-insights" aria-labelledby="ai-summary-heading">
           <div className="analytics-panel-heading">
@@ -465,11 +472,11 @@ function PrincipalTrendsPanel() {
       )}
 
       <section className="analytics-kpis" aria-label="Institution headline numbers">
-        <article><span>Total students</span><strong>{data.total_students}</strong></article>
-        <article><span>Average attendance</span><strong>{data.average_attendance.toFixed(1)}<small> %</small></strong></article>
-        <article><span>Average marks</span><strong>{data.average_marks.toFixed(1)}<small> %</small></strong></article>
-        <article><span>Placement readiness</span><strong>{data.placement_readiness.overall_average.toFixed(1)}</strong></article>
-        <article><span>Students placed</span><strong>{data.placement_trend.total_placed}</strong></article>
+        <article><span>Total students</span><strong><AnimatedNumber value={data.total_students} /></strong></article>
+        <article><span>Average attendance</span><strong><AnimatedNumber value={data.average_attendance} decimals={1} /><small> %</small></strong></article>
+        <article><span>Average marks</span><strong><AnimatedNumber value={data.average_marks} decimals={1} /><small> %</small></strong></article>
+        <article><span>Placement readiness</span><strong><AnimatedNumber value={data.placement_readiness.overall_average} decimals={1} /></strong></article>
+        <article><span>Students placed</span><strong><AnimatedNumber value={data.placement_trend.total_placed} /></strong></article>
       </section>
 
       <ChartPanel
@@ -535,7 +542,7 @@ function PrincipalTrendsPanel() {
           </ResponsiveContainer>
         </div>
       </ChartPanel>
-    </>
+    </div>
   );
 }
 

@@ -1924,3 +1924,94 @@ code {
   color: #4b6259;
   text-align: right;
 }
+
+
+/* ============================================================
+   Motion foundations — hover lift, fade-in, smooth transitions
+   ============================================================ */
+
+:root {
+  --motion-fast: 140ms;
+  --motion-base: 220ms;
+  --motion-slow: 420ms;
+  --ease-out: cubic-bezier(0.22, 0.68, 0.31, 1);
+}
+
+/* --- Hover lift on cards and panels --- */
+.analytics-panel,
+.feedback-card,
+.student-panel,
+.analytics-kpis article,
+.analytics-quality-kpis article,
+.skeleton-card {
+  transition:
+    transform var(--motion-base) var(--ease-out),
+    box-shadow var(--motion-base) var(--ease-out),
+    border-color var(--motion-base) var(--ease-out);
+  will-change: transform;
+}
+
+.analytics-panel:hover,
+.feedback-card:hover,
+.student-panel:hover,
+.analytics-kpis article:hover,
+.analytics-quality-kpis article:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(20, 45, 38, 0.10);
+}
+
+/* --- Buttons and tabs --- */
+.button,
+.student-nav-link,
+.analytics-nav button,
+.segment-action {
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    color var(--motion-fast) var(--ease-out),
+    transform var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-fast) var(--ease-out);
+}
+
+.button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(20, 45, 38, 0.12);
+}
+
+.button:active {
+  transform: translateY(0);
+}
+
+/* --- Reveal-on-scroll --- */
+.reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity var(--motion-slow) var(--ease-out),
+    transform var(--motion-slow) var(--ease-out);
+}
+
+.reveal-shown {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* --- Respect reduced motion --- */
+@media (prefers-reduced-motion: reduce) {
+  .analytics-panel,
+  .feedback-card,
+  .student-panel,
+  .analytics-kpis article,
+  .analytics-quality-kpis article,
+  .button,
+  .student-nav-link,
+  .analytics-nav button,
+  .segment-action,
+  .reveal {
+    transition: none !important;
+    transform: none !important;
+    animation: none !important;
+  }
+  .reveal {
+    opacity: 1;
+  }
+}
