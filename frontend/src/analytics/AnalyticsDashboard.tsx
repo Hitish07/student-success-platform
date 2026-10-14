@@ -18,10 +18,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { apiRequest } from "../api";
 import { SkeletonChart, SkeletonRows } from "../ui/Skeleton";
 import { Modal } from "../ui/Modal";
-import { useReveal } from "../ui/useReveal";
 import { AnimatedNumber } from "../ui/AnimatedNumber";
-import { SuccessScoreDistribution3D } from "./SuccessScoreDistribution3D";
-import { HighRiskByDepartment3D } from "./HighRiskByDepartment3D";
 import { useAuth } from "../auth/AuthContext";
 
 type RiskLevel = "Low" | "Medium" | "High";
@@ -397,7 +394,6 @@ const DEPARTMENT_COLORS = [
 
 function PrincipalTrendsPanel() {
   const { accessToken } = useAuth();
-  const { ref: revealRef, shown: revealShown } = useReveal<HTMLDivElement>();
   const [data, setData] = useState<PrincipalDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -456,10 +452,7 @@ function PrincipalTrendsPanel() {
   });
 
   return (
-    <div
-      className={`reveal ${revealShown ? "reveal-shown" : ""}`}
-      ref={revealRef}
-    >
+    <>
       {data.ai_summary && (
         <section className="analytics-panel analytics-insights" aria-labelledby="ai-summary-heading">
           <div className="analytics-panel-heading">
@@ -545,7 +538,7 @@ function PrincipalTrendsPanel() {
           </ResponsiveContainer>
         </div>
       </ChartPanel>
-    </div>
+    </>
   );
 }
 
@@ -861,11 +854,32 @@ export function AnalyticsDashboard({ role }: { role: "dean" | "principal" }) {
                   <article><span>Low-confidence scores</span><strong>{lowConfidence}</strong></article>
                 </section>
                 <div className="analytics-chart-grid">
-                  <ChartPanel title="Success Score distribution" description="Number of students in each score band. Drag to rotate.">
-                    <SuccessScoreDistribution3D students={data.students} />
+                  <ChartPanel title="Success Score distribution" description="Number of students in each score band.">
+                    <div className="analytics-chart">
+                      <ResponsiveContainer width="100%" height={285}>
+                        <BarChart data={scoreBuckets(data.students)} margin={{ bottom: 22, left: 0, right: 12 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis dataKey="range" label={{ value: "Success Score range", position: "insideBottom", offset: -12 }} />
+                          <YAxis allowDecimals={false} label={{ value: "Students", angle: -90, position: "insideLeft" }} />
+                          <Tooltip />
+                          <Bar dataKey="students" name="Students" fill="#7c3aed" radius={[5, 5, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
                   </ChartPanel>
-                  <ChartPanel title="High-risk students by department" description="Counts of students with High risk flags. Drag to rotate.">
-                    <HighRiskByDepartment3D students={data.students} />
+                  <ChartPanel title="High-risk students by department" description="Counts of students with High risk flags.">
+                    <div className="analytics-chart">
+                      <ResponsiveContainer width="100%" height={285}>
+                        <BarChart data={riskByDepartment(data.students)} margin={{ bottom: 22, left: 0, right: 12 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis dataKey="department" tick={{ fontSize: 10 }} label={{ value: "Department", position: "insideBottom", offset: -12 }} />
+                          <YAxis allowDecimals={false} label={{ value: "Students", angle: -90, position: "insideLeft" }} />
+                          <Tooltip />
+                          <Bar dataKey="academic" name="Academic risk" fill={RISK_COLORS.High} />
+                          <Bar dataKey="placement" name="Placement risk" fill={RISK_COLORS.Medium} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
                   </ChartPanel>
                 </div>
                 <section className="analytics-panel analytics-insights">
