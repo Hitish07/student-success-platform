@@ -37,12 +37,30 @@ class PersonalRisk(StudentPortalSchema):
     contributing_factors: list[RiskFactor]
 
 
+class ScoreDriverSummary(StudentPortalSchema):
+    indicator: str
+    contribution: float
+
+
+class SuccessScoreSummary(StudentPortalSchema):
+    score: float
+    academic_score: float
+    placement_score: float
+    engagement_score: float
+    academic_risk_level: str
+    placement_risk_level: str
+    confidence: str
+    top_positive_drivers: list[ScoreDriverSummary]
+    top_negative_drivers: list[ScoreDriverSummary]
+
+
 class StudentDashboard(StudentPortalSchema):
     attendance_percentage: float | None
     marks_percentage: float | None
     enrolled_courses: int
     courses: list[StudentCourse]
     risk: PersonalRisk | None
+    success_score: SuccessScoreSummary | None = None
 
 
 class StudentAcademicProfile(StudentPortalSchema):

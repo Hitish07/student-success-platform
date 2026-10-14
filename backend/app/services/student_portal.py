@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from app.models import Department, StudentProfile, User
 from app.repositories import student_portal as repository
 from app.schemas.student_portal import (
+    ScoreDriverSummary,
+    SuccessScoreSummary,
     FeedbackGiven,
     FeedbackReceived,
     FacultyCourseFeedback,
@@ -81,6 +83,53 @@ def _risk_factors(factors: dict[str, Any]) -> list[RiskFactor]:
     return sorted(values, key=lambda factor: factor.contribution, reverse=True)[:3]
 
 
+from app.services.data_integration import build_data_integration
+from app.services.success_analytics import score_students
+
+
+def _success_score_for(db: Session, student: User) -> SuccessScoreSummary | None:
+    """Compute this student's Success Score using the same pipeline
+    the analytics dashboard uses, so the numbers never drift."""
+    try:
+        integration = build_data_integration(db)
+    except Exception:
+        return None
+
+    unified = None
+    for candidate in getattr(integration, "students", []) or []:
+        if getattr(candidate, "student_id", None) == student.id:
+            unified = candidate
+            break
+    if unified is None:
+        return None
+
+    try:
+        results = score_students([unified])
+    except Exception:
+        return None
+    if not results:
+        return None
+
+    s = results[0]
+    return SuccessScoreSummary(
+        score=s.success_score,
+        academic_score=s.academic_score,
+        placement_score=s.placement_score,
+        engagement_score=s.engagement_score,
+        academic_risk_level=s.academic_risk.level,
+        placement_risk_level=s.placement_risk.level,
+        confidence=s.confidence,
+        top_positive_drivers=[
+            ScoreDriverSummary(indicator=d.indicator, contribution=d.contribution)
+            for d in s.score_drivers.positive
+        ],
+        top_negative_drivers=[
+            ScoreDriverSummary(indicator=d.indicator, contribution=d.contribution)
+            for d in s.score_drivers.negative
+        ],
+    )
+
+
 def get_dashboard(db: Session, student: User) -> StudentDashboard:
     course_rows = repository.enrolled_courses(db, student.id)
     attendance = repository.attendance_totals(db, student.id)
@@ -135,6 +184,7 @@ def get_dashboard(db: Session, student: User) -> StudentDashboard:
         enrolled_courses=len(courses),
         courses=courses,
         risk=risk,
+        success_score=_success_score_for(db, student),
     )
 
 
