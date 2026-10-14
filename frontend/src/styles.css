@@ -1836,3 +1836,91 @@ code {
     min-width: 560px;
   }
 }
+
+
+/* ---- Risk badge buttons (clickable badges in the students table) ---- */
+.risk-badge-button {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 999px;
+}
+.risk-badge-button:hover .risk-badge,
+.risk-badge-button:focus-visible .risk-badge {
+  filter: brightness(0.95);
+  outline: 2px solid rgba(39, 124, 108, 0.35);
+  outline-offset: 2px;
+}
+
+/* ---- Risk driver bars (used in the risk detail modal) ---- */
+.modal-action-line {
+  margin: 0 0 1rem;
+  color: #29463d;
+  line-height: 1.5;
+}
+
+.risk-driver-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.risk-driver-list li {
+  display: grid;
+  grid-template-columns: 10rem 1fr 4rem;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.risk-driver-label {
+  color: #29463d;
+  font-size: 0.9rem;
+  text-align: right;
+}
+
+.risk-driver-bar-track {
+  position: relative;
+  height: 14px;
+  background: #f0f5f3;
+  border-radius: 999px;
+  overflow: hidden;
+  display: block;
+}
+
+.risk-driver-bar-track::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #cbdad4;
+  z-index: 1;
+}
+
+.risk-driver-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  transition: width 200ms ease-out;
+}
+
+.risk-driver-bar-up {
+  background: #ca5144;
+  border-radius: 0 999px 999px 0;
+}
+
+.risk-driver-bar-down {
+  background: #2b8a62;
+  border-radius: 999px 0 0 999px;
+}
+
+.risk-driver-value {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  color: #4b6259;
+  text-align: right;
+}

@@ -17,6 +17,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { apiRequest } from "../api";
 import { SkeletonChart, SkeletonRows } from "../ui/Skeleton";
+import { Modal } from "../ui/Modal";
 import { useAuth } from "../auth/AuthContext";
 
 type RiskLevel = "Low" | "Medium" | "High";
@@ -538,12 +539,124 @@ function PrincipalTrendsPanel() {
   );
 }
 
+interface SegmentDetailModalProps {
+  segment: string;
+  action: string;
+  students: ScoredStudent[];
+  onClose: () => void;
+}
+
+function SegmentDetailModal({ segment, action, students, onClose }: SegmentDetailModalProps) {
+  const inSegment = students.filter((student) =>
+    // The parent computes membership by segment name; this is a defensive filter.
+    // The parent passes an already-filtered list, so this returns the same array.
+    Boolean(student),
+  );
+  return (
+    <Modal
+      onClose={onClose}
+      size="large"
+      subtitle={`${inSegment.length} student${inSegment.length === 1 ? "" : "s"} in this segment`}
+      title={segment}
+    >
+      <p className="modal-action-line">
+        <strong>Suggested next step:</strong> {action}
+      </p>
+      {inSegment.length === 0 ? (
+        <p className="analytics-empty">No students are currently in this segment.</p>
+      ) : (
+        <div className="analytics-table-wrap">
+          <table className="analytics-table">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Department</th>
+                <th>Success Score</th>
+                <th>Academic risk</th>
+                <th>Placement risk</th>
+              </tr>
+            </thead>
+            <tbody>
+              {inSegment.map((student) => (
+                <tr key={student.student_id}>
+                  <td>
+                    <strong>{student.student_name}</strong>
+                    <small>ID {student.student_id}</small>
+                  </td>
+                  <td>{student.department ?? "Unassigned"}</td>
+                  <td><strong>{student.success_score.toFixed(1)}</strong></td>
+                  <td><RiskBadge level={student.academic_risk.level} /></td>
+                  <td><RiskBadge level={student.placement_risk.level} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+interface RiskDetailModalProps {
+  title: string;
+  risk: RiskFlag;
+  onClose: () => void;
+}
+
+function RiskDetailModal({ title, risk, onClose }: RiskDetailModalProps) {
+  const all = [...risk.drivers.positive, ...risk.drivers.negative];
+  const maxContribution = Math.max(1, ...all.map((driver) => Math.abs(driver.contribution)));
+  return (
+    <Modal
+      onClose={onClose}
+      size="medium"
+      subtitle={`Risk score ${risk.risk_score.toFixed(1)} out of 100 · ${risk.level}`}
+      title={title}
+    >
+      <p className="modal-action-line">
+        <strong>What pushes this risk up or down:</strong> bars to the right raise the score (more risk),
+        bars to the left lower it.
+      </p>
+      {all.length === 0 ? (
+        <p className="analytics-empty">No drivers available for this risk.</p>
+      ) : (
+        <ul className="risk-driver-list">
+          {all.map((driver, index) => {
+            const widthPct = Math.round((Math.abs(driver.contribution) / maxContribution) * 50);
+            const isPositive = driver.contribution > 0;
+            return (
+              <li key={`${driver.indicator}-${index}`}>
+                <span className="risk-driver-label">{driver.indicator}</span>
+                <span className="risk-driver-bar-track">
+                  <span
+                    className={`risk-driver-bar ${isPositive ? "risk-driver-bar-up" : "risk-driver-bar-down"}`}
+                    style={{
+                      width: `${widthPct}%`,
+                      [isPositive ? "left" : "right"]: "50%",
+                    }}
+                  />
+                </span>
+                <span className="risk-driver-value">
+                  {isPositive ? "+" : ""}
+                  {driver.contribution.toFixed(2)}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Modal>
+  );
+}
+
 export function AnalyticsDashboard({ role }: { role: "dean" | "principal" }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { data, isLoading, error, retry } = useDashboardData();
   const [section, setSection] = useState<Section>("overview");
   const [selectedStudent, setSelectedStudent] = useState<ScoredStudent | null>(null);
+  const [selectedSegmentDetail, setSelectedSegmentDetail] = useState<string | null>(null);
+  const [selectedRisk, setSelectedRisk] = useState<{ title: string; risk: RiskFlag } | null>(null);
   const [selectedSegment, setSelectedSegment] = useState("");
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("");
@@ -741,8 +854,7 @@ export function AnalyticsDashboard({ role }: { role: "dean" | "principal" }) {
                   <div className="segment-action-list">
                     {Array.from(new Map(data.segments.map((item) => [item.segment, item])).values()).map((item, index) => (
                       <button className="segment-action" key={item.segment} onClick={() => {
-                        setSelectedSegment(item.segment);
-                        setSection("students");
+                        setSelectedSegmentDetail(item.segment);
                       }} type="button">
                         <span className="segment-color" style={{ backgroundColor: SEGMENT_COLORS[index % SEGMENT_COLORS.length] }} />
                         <span><strong>{item.segment}</strong><small>{item.suggested_action}</small></span>
@@ -784,8 +896,36 @@ export function AnalyticsDashboard({ role }: { role: "dean" | "principal" }) {
                           <td><strong>{student.student_name}</strong><small>ID {student.student_id}</small></td>
                           <td>{student.department ?? "Unassigned"}</td>
                           <td><strong>{student.success_score.toFixed(1)}</strong>{student.confidence === "low confidence" && <small className="confidence-inline">Low confidence</small>}</td>
-                          <td><RiskBadge level={student.academic_risk.level} /></td>
-                          <td><RiskBadge level={student.placement_risk.level} /></td>
+                          <td>
+                            <button
+                              className="risk-badge-button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedRisk({
+                                  title: `${student.student_name} · Academic risk`,
+                                  risk: student.academic_risk,
+                                });
+                              }}
+                              type="button"
+                            >
+                              <RiskBadge level={student.academic_risk.level} />
+                            </button>
+                          </td>
+                          <td>
+                            <button
+                              className="risk-badge-button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedRisk({
+                                  title: `${student.student_name} · Placement risk`,
+                                  risk: student.placement_risk,
+                                });
+                              }}
+                              type="button"
+                            >
+                              <RiskBadge level={student.placement_risk.level} />
+                            </button>
+                          </td>
                           <td>{data.segments.find((item) => item.student_id === student.student_id)?.segment ?? "—"}</td>
                           <td>{student.data_completeness.toFixed(0)}%</td>
                         </tr>
@@ -845,6 +985,28 @@ export function AnalyticsDashboard({ role }: { role: "dean" | "principal" }) {
           </>
         )}
       </div>
+      {selectedSegmentDetail !== null && data && (
+        <SegmentDetailModal
+          action={
+            data.segments.find((row) => row.segment === selectedSegmentDetail)
+              ?.suggested_action ?? ""
+          }
+          onClose={() => setSelectedSegmentDetail(null)}
+          segment={selectedSegmentDetail}
+          students={data.students.filter(
+            (student) =>
+              data.segments.find((row) => row.student_id === student.student_id)?.segment ===
+              selectedSegmentDetail,
+          )}
+        />
+      )}
+      {selectedRisk !== null && (
+        <RiskDetailModal
+          onClose={() => setSelectedRisk(null)}
+          risk={selectedRisk.risk}
+          title={selectedRisk.title}
+        />
+      )}
       {selectedStudent && data && (
         <StudentDetail
           student={selectedStudent}
