@@ -1,4 +1,4 @@
-FROM python:3.13-slim
+﻿FROM python:3.13-slim
 
 WORKDIR /app
 
@@ -7,12 +7,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY backend/ .
 
-# Render reads PORT (default 10000)
 ENV PORT=10000
 EXPOSE 10000
 
