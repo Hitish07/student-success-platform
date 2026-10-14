@@ -1,4 +1,5 @@
 import ReactECharts from "echarts-for-react";
+import "echarts-gl";
 
 import type { ScoredStudent } from "./AnalyticsDashboard";
 
