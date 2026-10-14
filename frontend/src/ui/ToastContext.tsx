@@ -86,10 +86,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 }
 
+const NOOP_TOAST: ToastContextValue = {
+  push: () => {},
+  success: () => {},
+  error: () => {},
+  info: () => {},
+};
+
 export function useToast(): ToastContextValue {
   const context = useContext(ToastContext);
-  if (context === null) {
-    throw new Error("useToast must be used inside a ToastProvider");
-  }
-  return context;
+  // Outside a provider (e.g. in tests) return a no-op so components do not crash.
+  return context ?? NOOP_TOAST;
 }

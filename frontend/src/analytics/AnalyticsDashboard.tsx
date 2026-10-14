@@ -395,6 +395,7 @@ const DEPARTMENT_COLORS = [
 
 function PrincipalTrendsPanel() {
   const { accessToken } = useAuth();
+  const { ref: revealRef, shown: revealShown } = useReveal<HTMLDivElement>();
   const [data, setData] = useState<PrincipalDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -451,8 +452,6 @@ function PrincipalTrendsPanel() {
     });
     return row;
   });
-
-  const { ref: revealRef, shown: revealShown } = useReveal<HTMLDivElement>();
 
   return (
     <div

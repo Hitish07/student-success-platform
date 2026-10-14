@@ -225,12 +225,19 @@ describe("dean and principal analytics dashboard", () => {
     await screen.findByRole("heading", { name: "Department success dashboard" });
     await screen.findByText("Success Score distribution");
     fireEvent.click(screen.getByRole("button", { name: "Segments" }));
-    fireEvent.click(screen.getByRole("button", { name: /Strong academics, placement gap/ }));
-    expect(await screen.findByText(/1 of 1 students/)).toBeTruthy();
-    fireEvent.click(screen.getByText("Avery Demo"));
-    expect(await screen.findByRole("dialog")).toBeTruthy();
-    expect(screen.getByText("Positive score drivers")).toBeTruthy();
-    expect(within(screen.getByRole("dialog")).getByText(/Strong academics, placement gap/)).toBeTruthy();
+
+    // The segment card lists every student in that segment, with the action.
+    const segmentCard = await screen.findByRole("button", {
+      name: /Strong academics, placement gap/,
+    });
+    fireEvent.click(segmentCard);
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/1 student in this segment/)).toBeTruthy();
+    expect(within(dialog).getByText("Avery Demo")).toBeTruthy();
+    expect(
+      within(dialog).getByText(/Strong academics, placement gap/),
+    ).toBeTruthy();
   });
 
   it("shows scoped source quality counts and a before/after example", async () => {
@@ -262,16 +269,18 @@ describe("dean and principal analytics dashboard", () => {
 
     expect(await screen.findByText(/Computer Science leads the campus/)).toBeTruthy();
     expect(screen.getByText("Total students")).toBeTruthy();
-    expect(screen.getByText("120")).toBeTruthy();
     expect(screen.getByText("Average attendance")).toBeTruthy();
-    expect(screen.getByText("78.5")).toBeTruthy();
     expect(screen.getByText("Average marks")).toBeTruthy();
-    expect(screen.getByText("68.2")).toBeTruthy();
     expect(screen.getAllByText("Placement readiness").length).toBeGreaterThan(0);
-    expect(screen.getByText("71.0")).toBeTruthy();
     expect(screen.getByText("Students placed")).toBeTruthy();
-    expect(screen.getByText("5")).toBeTruthy();
     expect(screen.getByText("Placements over time")).toBeTruthy();
+
+    // AnimatedNumber counts up from 0, so poll for the final value.
+    expect(await screen.findByText("120")).toBeTruthy();
+    expect(await screen.findByText("78.5")).toBeTruthy();
+    expect(await screen.findByText("68.2")).toBeTruthy();
+    expect(await screen.findByText("71.0")).toBeTruthy();
+    expect(await screen.findByText("5")).toBeTruthy();
   });
 
 });
