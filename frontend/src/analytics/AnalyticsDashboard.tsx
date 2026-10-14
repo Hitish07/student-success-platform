@@ -479,6 +479,8 @@ function PrincipalTrendsPanel() {
         <article><span>Students placed</span><strong><AnimatedNumber value={data.placement_trend.total_placed} /></strong></article>
       </section>
 
+      <DepartmentLeaderboard lines={data.academic_trend.by_department} />
+
       <ChartPanel
         title="Academic improvement over time"
         description="Average marks per month across the institution and each department."
@@ -653,6 +655,67 @@ function RiskDetailModal({ title, risk, onClose }: RiskDetailModalProps) {
         </ul>
       )}
     </Modal>
+  );
+}
+
+interface LeaderboardRow {
+  name: string;
+  latest: number;
+  first: number;
+  color: string;
+}
+
+function DepartmentLeaderboard({ lines }: { lines: SeriesLine[] }) {
+  const rows: LeaderboardRow[] = lines
+    .map((line, index) => {
+      const first = line.points[0]?.value ?? 0;
+      const latest = line.points[line.points.length - 1]?.value ?? 0;
+      return {
+        name: line.name,
+        first,
+        latest,
+        color: DEPARTMENT_COLORS[index % DEPARTMENT_COLORS.length],
+      };
+    })
+    .sort((a, b) => b.latest - a.latest);
+
+  if (rows.length === 0) return null;
+
+  const max = Math.max(1, ...rows.map((row) => row.latest));
+
+  return (
+    <ChartPanel
+      title="Department leaderboard"
+      description="Departments ranked by average marks in the most recent month."
+    >
+      <ol className="leaderboard-list">
+        {rows.map((row, index) => {
+          const widthPct = Math.round((row.latest / max) * 100);
+          const delta = row.latest - row.first;
+          const trend =
+            delta > 1 ? "up" : delta < -1 ? "down" : "flat";
+          const trendSymbol = trend === "up" ? "↑" : trend === "down" ? "↓" : "→";
+          return (
+            <li className="leaderboard-row" key={row.name}>
+              <span className="leaderboard-rank">{index + 1}</span>
+              <span className="leaderboard-name">{row.name}</span>
+              <span className="leaderboard-bar-track">
+                <span
+                  className="leaderboard-bar"
+                  style={{ width: `${widthPct}%`, backgroundColor: row.color }}
+                />
+              </span>
+              <span className={`leaderboard-trend leaderboard-${trend}`}>
+                {trendSymbol}
+              </span>
+              <span className="leaderboard-value">
+                <AnimatedNumber value={row.latest} decimals={1} />
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </ChartPanel>
   );
 }
 
