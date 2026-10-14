@@ -95,22 +95,22 @@ def _success_score_for(db: Session, student: User) -> SuccessScoreSummary | None
     except Exception:
         return None
 
-    unified = None
-    for candidate in getattr(integration, "students", []) or []:
-        if getattr(candidate, "student_id", None) == student.id:
-            unified = candidate
-            break
-    if unified is None:
+    cohort = list(getattr(integration, "students", []) or [])
+    if not cohort:
+        return None
+    if not any(getattr(candidate, "student_id", None) == student.id for candidate in cohort):
         return None
 
+    # Score the whole cohort so driver contributions are computed
+    # against real peers, not against the student alone.
     try:
-        results = score_students([unified])
+        results = score_students(cohort)
     except Exception:
         return None
-    if not results:
-        return None
 
-    s = results[0]
+    s = next((row for row in results if row.student_id == student.id), None)
+    if s is None:
+        return None
     return SuccessScoreSummary(
         score=s.success_score,
         academic_score=s.academic_score,
