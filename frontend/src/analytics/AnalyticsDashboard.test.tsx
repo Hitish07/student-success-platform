@@ -199,14 +199,17 @@ afterEach(() => {
 
 describe("dean and principal analytics dashboard", () => {
   it.each([
-    ["dean", "Try Dean demo", "Department success dashboard", "Your department"],
-    ["principal", "Try Principal demo", "Campus success dashboard", "All departments"],
-  ])("loads the seeded %s dashboard", async (role, demoButton, title, scope) => {
+    ["dean", "dean.cs@demo.invalid", "Department success dashboard", "Your department"],
+    ["principal", "principal@demo.invalid", "Campus success dashboard", "All departments"],
+  ])("loads the seeded %s dashboard", async (role, email, title, scope) => {
     const fetchMock = mockApi({ loginRole: role as "dean" | "principal" });
     sessionStorage.clear();
     render(<MemoryRouter initialEntries={["/login"]}><App /></MemoryRouter>);
 
-    fireEvent.click(await screen.findByRole("button", { name: demoButton }));
+    fireEvent.change(await screen.findByLabelText("Email address"), { target: { value: email } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "DemoPass123!" } });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
     expect(fetchMock).toHaveBeenCalledWith(
       "/auth/login",
       expect.objectContaining({ method: "POST" }),
