@@ -131,19 +131,6 @@ function LoginPage() {
     }
   }
 
-  async function handleDemoLogin(email: string) {
-    setError(null);
-    setIsSubmitting(true);
-    try {
-      const currentUser = await login(email, "DemoPass123!");
-      navigate(portalPaths[currentUser.role], { replace: true });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to sign in to the demo.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
   return (
     <AuthFrame>
       <p className="eyebrow">Welcome back</p>
@@ -174,18 +161,6 @@ function LoginPage() {
         </button>
       </form>
       <p className="auth-switch"><Link to="/forgot-password">Forgot password?</Link></p>
-      <section className="demo-login" aria-label="Analytics demo accounts">
-        <p>Or open a seeded analytics demo:</p>
-        <div>
-          <button className="button button-small button-outline" disabled={isSubmitting} onClick={() => void handleDemoLogin("dean.cs@demo.invalid")} type="button">
-            Try Dean demo
-          </button>
-          <button className="button button-small button-outline" disabled={isSubmitting} onClick={() => void handleDemoLogin("principal@demo.invalid")} type="button">
-            Try Principal demo
-          </button>
-        </div>
-        <small>Fictional demo data · DemoPass123!</small>
-      </section>
       <p className="auth-switch">
         Student without an account? <Link to="/register">Create one</Link>
         {" · "}Faculty? <Link to="/register/faculty">Register here</Link>
