@@ -858,16 +858,36 @@ export function AnalyticsDashboard({ role }: { role: "dean" | "principal" }) {
                 </ChartPanel>
                 <section className="analytics-panel">
                   <div className="analytics-panel-heading"><div><h2>Suggested actions</h2><p>One practical next step for each segment.</p></div></div>
-                  <div className="segment-action-list">
-                    {Array.from(new Map(data.segments.map((item) => [item.segment, item])).values()).map((item, index) => (
-                      <button className="segment-action" key={item.segment} onClick={() => {
-                        setSelectedSegmentDetail(item.segment);
-                      }} type="button">
-                        <span className="segment-color" style={{ backgroundColor: SEGMENT_COLORS[index % SEGMENT_COLORS.length] }} />
-                        <span><strong>{item.segment}</strong><small>{item.suggested_action}</small></span>
-                        <b>{segmentCounts.find((row) => row.name === item.segment)?.students ?? 0}</b>
-                      </button>
-                    ))}
+                  <div className="segment-card-grid">
+                    {(() => {
+                      const total = data.students.length || 1;
+                      return Array.from(new Map(data.segments.map((item) => [item.segment, item])).values()).map((item, index) => {
+                        const count = segmentCounts.find((row) => row.name === item.segment)?.students ?? 0;
+                        const pct = Math.round((count / total) * 100);
+                        const color = SEGMENT_COLORS[index % SEGMENT_COLORS.length];
+                        return (
+                          <button
+                            className="segment-card"
+                            key={item.segment}
+                            onClick={() => setSelectedSegmentDetail(item.segment)}
+                            style={{ ["--segment-color" as string]: color }}
+                            type="button"
+                          >
+                            <span className="segment-card-top">
+                              <span className="segment-card-dot" />
+                              <span className="segment-card-count">{count}</span>
+                            </span>
+                            <span className="segment-card-name">{item.segment}</span>
+                            <span className="segment-card-bar-track">
+                              <span className="segment-card-bar" style={{ width: `${pct}%` }} />
+                            </span>
+                            <span className="segment-card-meta">{pct}% of the cohort</span>
+                            <span className="segment-card-action">{item.suggested_action}</span>
+                            <span className="segment-card-cta">View students →</span>
+                          </button>
+                        );
+                      });
+                    })()}
                   </div>
                 </section>
               </div>
