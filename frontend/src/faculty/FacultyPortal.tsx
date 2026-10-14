@@ -5,6 +5,7 @@ import { Link, NavLink, Outlet } from "react-router-dom";
 
 import { apiRequest } from "../api";
 import { useAuth } from "../auth/AuthContext";
+import { useToast } from "../ui/ToastContext";
 
 interface FacultyCourse {
   id: number;
@@ -838,6 +839,7 @@ interface PlacementView {
 }
 
 function PlacementsScreen() {
+  const toast = useToast();
   const dashboard = useDashboard();
   const { accessToken } = useAuth();
   const [courseId, setCourseId] = useState("");
@@ -882,7 +884,7 @@ function PlacementsScreen() {
         },
         accessToken ?? undefined,
       );
-      setSuccess("Placement recorded.");
+      toast.success("Placement recorded.");
       setCompany("");
       setRole("");
       setPackageLpa("");
