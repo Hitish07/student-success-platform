@@ -16,6 +16,7 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 
 import { apiRequest } from "../api";
+import { SkeletonChart, SkeletonRows } from "../ui/Skeleton";
 import { useAuth } from "../auth/AuthContext";
 
 type RiskLevel = "Low" | "Medium" | "High";
@@ -416,7 +417,12 @@ function PrincipalTrendsPanel() {
   }, [accessToken, reload]);
 
   if (loading) {
-    return <p className="student-state" role="status">Loading institution trends...</p>;
+    return (
+      <div aria-busy="true" className="student-panel">
+        <SkeletonRows rows={2} />
+        <SkeletonChart />
+      </div>
+    );
   }
   if (error) {
     return (

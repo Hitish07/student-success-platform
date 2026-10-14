@@ -1,0 +1,49 @@
+.skeleton {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    #e6ece9 0%,
+    #f2f6f4 40%,
+    #e6ece9 80%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-card {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem 1.1rem;
+  background: #ffffff;
+  border: 1px solid #e4ece8;
+  border-radius: 12px;
+}
+
+.skeleton-rows {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #eef3f1;
+}
+
+.skeleton-chart {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem 0;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}

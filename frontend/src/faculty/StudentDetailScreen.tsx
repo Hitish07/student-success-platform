@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { apiRequest } from "../api";
+import { SkeletonChart, SkeletonRows } from "../ui/Skeleton";
 import { useAuth } from "../auth/AuthContext";
 
 interface Student360Header {
@@ -101,7 +102,12 @@ export function StudentDetailScreen() {
   }, [studentId, accessToken, reload]);
 
   if (loading) {
-    return <p className="student-state" role="status">Loading student profile...</p>;
+    return (
+      <div aria-busy="true" className="student-panel">
+        <SkeletonRows rows={3} />
+        <SkeletonChart />
+      </div>
+    );
   }
   if (error) {
     return (
